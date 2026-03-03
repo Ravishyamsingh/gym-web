@@ -13,6 +13,9 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminMembers from "./pages/admin/AdminMembers";
 import AdminPayments from "./pages/admin/AdminPayments";
 import AdminSettings from "./pages/admin/AdminSettings";
+import MembershipPage from "./pages/onboarding/MembershipPage";
+import PaymentPage from "./pages/onboarding/PaymentPage";
+import FaceRegistrationPage from "./pages/onboarding/FaceRegistrationPage";
 
 // Layouts
 import AdminLayout from "./components/layout/AdminLayout";
@@ -40,17 +43,26 @@ function AdminRoute({ children }) {
 }
 
 function GuestRoute({ children }) {
-  const { isAuthenticated, isAdmin, loading } = useAuth();
+  const { isAuthenticated, loading, getOnboardingRedirect } = useAuth();
   if (loading) return <FullScreenLoader />;
-  if (isAuthenticated) return <Navigate to={isAdmin ? "/admin" : "/dashboard"} replace />;
+  if (isAuthenticated) return <Navigate to={getOnboardingRedirect()} replace />;
+  return children;
+}
+
+function MembershipRoute({ children }) {
+  const { isAuthenticated, loading, dbUser } = useAuth();
+  if (loading) return <FullScreenLoader />;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
   return children;
 }
 
 function ProfileCompleteRoute({ children }) {
-  const { isAuthenticated, profileComplete, loading } = useAuth();
+  const { isAuthenticated, loading, dbUser } = useAuth();
   if (loading) return <FullScreenLoader />;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  if (!profileComplete) return <Navigate to="/complete-profile" replace />;
+  // Require active membership and face registration for protected features
+  if (dbUser?.paymentStatus !== "active") return <Navigate to="/dashboard" replace />;
+  if (!dbUser?.faceRegistered) return <Navigate to="/dashboard" replace />;
   return children;
 }
 
@@ -70,8 +82,13 @@ export default function App() {
         {/* Profile completion */}
         <Route path="/complete-profile" element={<PrivateRoute><CompleteProfilePage /></PrivateRoute>} />
 
+        {/* Onboarding flow */}
+        <Route path="/onboarding/membership" element={<PrivateRoute><MembershipPage /></PrivateRoute>} />
+        <Route path="/onboarding/payment" element={<PrivateRoute><PaymentPage /></PrivateRoute>} />
+        <Route path="/onboarding/face-registration" element={<PrivateRoute><FaceRegistrationPage /></PrivateRoute>} />
+
         {/* Authenticated user */}
-        <Route path="/dashboard" element={<ProfileCompleteRoute><UserDashboard /></ProfileCompleteRoute>} />
+        <Route path="/dashboard" element={<PrivateRoute><UserDashboard /></PrivateRoute>} />
         <Route path="/verify" element={<ProfileCompleteRoute><VerifyFace /></ProfileCompleteRoute>} />
 
         {/* Admin */}

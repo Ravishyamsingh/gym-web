@@ -57,3 +57,59 @@ exports.create = async (req, res, next) => {
     next(err);
   }
 };
+
+// ─────────────────────────────────────────────
+// POST /api/payments/process
+// User: process membership payment during onboarding.
+// Requires authentication. Updates user's paymentStatus to "active".
+// ─────────────────────────────────────────────
+exports.processMembership = async (req, res, next) => {
+  try {
+    const { planId, duration, amount } = req.body;
+    const userId = req.dbUser._id;
+
+    if (!planId || !duration || !amount) {
+      return res.status(400).json({ error: "planId, duration, and amount are required" });
+    }
+
+    // Calculate expiry date based on plan
+    const expiryDate = new Date();
+    if (planId === "1month") {
+      expiryDate.setMonth(expiryDate.getMonth() + 1);
+    } else if (planId === "6months") {
+      expiryDate.setMonth(expiryDate.getMonth() + 6);
+    } else if (planId === "1year") {
+      expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+    }
+
+    // Create payment record
+    const payment = await Payment.create({
+      userId,
+      amount,
+      expiryDate,
+      status: "paid",
+      planId,
+      duration,
+    });
+
+    // Update user's payment status and membership details
+    const user = await User.findByIdAndUpdate(
+      userId,
+      {
+        paymentStatus: "active",
+        membershipPlan: planId,
+        membershipStartDate: new Date(),
+        membershipExpiry: expiryDate,
+      },
+      { new: true }
+    );
+
+    return res.status(201).json({
+      message: "Payment processed successfully",
+      payment,
+      user,
+    });
+  } catch (err) {
+    next(err);
+  }
+};

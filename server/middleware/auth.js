@@ -44,14 +44,17 @@ const requireAdmin = (req, res, next) => {
 };
 
 /**
- * Verify user has completed their profile (has face descriptor).
+ * Verify user has completed onboarding (active payment + face registered).
  * Must be used AFTER verifyToken.
  */
 const requireProfileComplete = (req, res, next) => {
   if (!req.dbUser) {
     return res.status(401).json({ error: "User not authenticated" });
   }
-  if (!req.dbUser.faceDescriptor || req.dbUser.faceDescriptor.length !== 128) {
+  if (req.dbUser.paymentStatus !== "active") {
+    return res.status(403).json({ error: "Profile incomplete — complete membership payment first" });
+  }
+  if (!req.dbUser.faceRegistered) {
     return res.status(403).json({ error: "Profile incomplete — complete face registration first" });
   }
   next();

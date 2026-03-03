@@ -42,11 +42,36 @@ const userSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    // Membership details
+    membershipPlan: {
+      type: String,
+      enum: ["1month", "6months", "1year", null],
+      default: null,
+    },
+    membershipStartDate: {
+      type: Date,
+      default: null,
+    },
+    membershipExpiry: {
+      type: Date,
+      default: null,
+    },
+    // Whether face registration is completed
+    faceRegistered: {
+      type: Boolean,
+      default: false,
+    },
     // 128-dimensional Float32 array produced by face-api.js
     // Used for Euclidean-distance matching on subsequent scans
     faceDescriptor: {
       type: [Number],
       default: [],
+    },
+    // Authentication provider (email, google, etc.)
+    authProvider: {
+      type: String,
+      enum: ["email", "google"],
+      default: "email",
     },
   },
   { timestamps: true }

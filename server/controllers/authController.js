@@ -20,7 +20,7 @@ function isValidFaceDescriptor(fd) {
   );
 }
 
-// ─────────────────────────────────────────────
+// ─────────────────��───────────────────────────
 // POST /api/auth/register
 // Security: requires a valid Firebase ID-token in the Authorization header.
 // The decoded uid must match the firebaseId in the request body.
@@ -34,7 +34,7 @@ exports.register = async (req, res, next) => {
       return res.status(401).json({ error: "Authorization Bearer token is required" });
     }
 
-    const { firebaseId, name, email, faceDescriptor } = req.body;
+    const { firebaseId, name, email, faceDescriptor, authProvider } = req.body;
 
     if (!firebaseId || !name || !email) {
       return res.status(400).json({ error: "firebaseId, name, and email are required" });
@@ -46,7 +46,8 @@ exports.register = async (req, res, next) => {
     }
 
     // ── Validate faceDescriptor if provided ──────────────────
-    if (faceDescriptor && !isValidFaceDescriptor(faceDescriptor)) {
+    // Allow empty array for Google users, but if provided must be exactly 128 values
+    if (faceDescriptor && faceDescriptor.length > 0 && !isValidFaceDescriptor(faceDescriptor)) {
       return res.status(400).json({ error: "faceDescriptor must be an array of exactly 128 numeric values" });
     }
 
@@ -65,6 +66,7 @@ exports.register = async (req, res, next) => {
       email: email.toLowerCase(),
       role,
       faceDescriptor: faceDescriptor || [],
+      authProvider: authProvider || "email",
     });
 
     return res.status(201).json({ message: "User registered", user });
@@ -72,6 +74,10 @@ exports.register = async (req, res, next) => {
     // Firebase token verification errors surface here
     if (err.code === "auth/argument-error" || err.code === "auth/id-token-expired") {
       return res.status(401).json({ error: "Invalid or expired Firebase token" });
+    }
+    // MongoDB duplicate key error (email already exists)
+    if (err.code === 11000) {
+      return res.status(409).json({ error: "A user with this email already exists" });
     }
     next(err);
   }
@@ -85,7 +91,7 @@ exports.register = async (req, res, next) => {
 // ─────────────────────────────────────────────
 exports.login = async (req, res, next) => {
   try {
-    // ── Firebase token verification ──────────────────────────
+    // ── Firebase token verification ──────────────────���───────
     const decoded = await verifyAuthHeader(req);
     if (!decoded) {
       return res.status(401).json({ error: "Authorization Bearer token is required" });
@@ -97,8 +103,10 @@ exports.login = async (req, res, next) => {
       return res.status(404).json({ error: "User not found — complete registration first" });
     }
 
-    // Check if user profile is complete (has face descriptor)
-    const profileComplete = user.faceDescriptor && user.faceDescriptor.length === 128;
+    // Check if user profile is complete (has face descriptor and active payment)
+    const profileComplete = 
+      user.faceRegistered === true && 
+      user.paymentStatus === "active";
 
     return res.json({ 
       message: "Login successful", 
@@ -107,6 +115,96 @@ exports.login = async (req, res, next) => {
     });
   } catch (err) {
     // Firebase token verification errors surface here
+    if (err.code === "auth/argument-error" || err.code === "auth/id-token-expired") {
+      return res.status(401).json({ error: "Invalid or expired Firebase token" });
+    }
+    next(err);
+  }
+};
+
+// ─────────────────────────────────────────────
+// GET /api/auth/check-user
+// Public endpoint: check if a user exists by email
+// Returns { exists: boolean }
+// ─────────────────────────────────────────────
+exports.checkUserExists = async (req, res, next) => {
+  try {
+    const { email } = req.query;
+    
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+    return res.json({ exists: !!user });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ─────────────────────────────────────────────
+// POST /api/auth/google
+// Google authentication: login existing user or auto-register new one.
+// Requires a valid Firebase ID-token from Google sign-in.
+// ─────────────────────────────────────────────
+exports.googleAuth = async (req, res, next) => {
+  try {
+    const decoded = await verifyAuthHeader(req);
+    if (!decoded) {
+      return res.status(401).json({ error: "Authorization Bearer token is required" });
+    }
+
+    // Try to find existing user
+    let user = await User.findOne({ firebaseId: decoded.uid });
+
+    if (user) {
+      // Existing user — login
+      const profileComplete =
+        user.faceRegistered === true &&
+        user.paymentStatus === "active";
+
+      return res.json({
+        message: "Login successful",
+        user,
+        profileComplete,
+        isNewUser: false,
+      });
+    }
+
+    // New Google user — auto-register
+    const { name, email } = req.body;
+    const displayName = name || decoded.name || (decoded.email ? decoded.email.split("@")[0] : "User");
+    const userEmail = (email || decoded.email || "").toLowerCase();
+
+    if (!userEmail) {
+      return res.status(400).json({ error: "Email is required for registration" });
+    }
+
+    // Check if email is already taken by another account
+    const existingEmail = await User.findOne({ email: userEmail });
+    if (existingEmail) {
+      return res.status(409).json({ error: "An account with this email already exists. Please use email login." });
+    }
+
+    // Auto-assign admin role if the email matches ADMIN_EMAIL env var
+    const role = userEmail === (process.env.ADMIN_EMAIL || "").toLowerCase() ? "admin" : "user";
+
+    user = await User.create({
+      firebaseId: decoded.uid,
+      name: displayName,
+      email: userEmail,
+      role,
+      faceDescriptor: [],
+      authProvider: "google",
+    });
+
+    return res.status(201).json({
+      message: "User registered via Google",
+      user,
+      profileComplete: false,
+      isNewUser: true,
+    });
+  } catch (err) {
     if (err.code === "auth/argument-error" || err.code === "auth/id-token-expired") {
       return res.status(401).json({ error: "Invalid or expired Firebase token" });
     }

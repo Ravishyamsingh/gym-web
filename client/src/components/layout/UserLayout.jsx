@@ -1,6 +1,6 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { Home, ScanFace, LogOut } from "lucide-react";
+import { Home, ScanFace, LogOut, CreditCard } from "lucide-react";
 
 /**
  * Mobile-optimised shell for the user-facing pages.
@@ -14,6 +14,8 @@ export default function UserLayout({ children }) {
     await logout();
     navigate("/");
   };
+
+  const hasActiveMembership = dbUser?.paymentStatus === "active";
 
   return (
     <div className="flex min-h-screen flex-col bg-void">
@@ -30,7 +32,7 @@ export default function UserLayout({ children }) {
         </div>
       </header>
 
-      {/* ── Content ───────────────────────── */}
+      {/* ── Content ��──────────────────────── */}
       <main className="flex-1 overflow-y-auto p-4">{children}</main>
 
       {/* ── Bottom nav (mobile-first) ─────── */}
@@ -47,17 +49,32 @@ export default function UserLayout({ children }) {
           <Home size={20} />
           Home
         </NavLink>
-        <NavLink
-          to="/verify"
-          className={({ isActive }) =>
-            `flex flex-1 flex-col items-center gap-1 py-3 text-[11px] font-medium transition-colors ${
-              isActive ? "text-blood" : "text-white/40"
-            }`
-          }
-        >
-          <ScanFace size={20} />
-          Verify
-        </NavLink>
+        {!hasActiveMembership && (
+          <NavLink
+            to="/onboarding/membership"
+            className={({ isActive }) =>
+              `flex flex-1 flex-col items-center gap-1 py-3 text-[11px] font-medium transition-colors ${
+                isActive ? "text-blood" : "text-white/40"
+              }`
+            }
+          >
+            <CreditCard size={20} />
+            Membership
+          </NavLink>
+        )}
+        {hasActiveMembership && (
+          <NavLink
+            to="/verify"
+            className={({ isActive }) =>
+              `flex flex-1 flex-col items-center gap-1 py-3 text-[11px] font-medium transition-colors ${
+                isActive ? "text-blood" : "text-white/40"
+              }`
+            }
+          >
+            <ScanFace size={20} />
+            Verify
+          </NavLink>
+        )}
       </nav>
     </div>
   );

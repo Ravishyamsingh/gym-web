@@ -5,8 +5,9 @@ import UserLayout from "@/components/layout/UserLayout";
 import { Card, CardContent, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import MembershipEndBox from "@/components/ui/MembershipEndBox";
 import { motion, useMotionValue, useTransform, animate } from "framer-motion";
-import { Flame, CalendarDays, ScanFace } from "lucide-react";
+import { Flame, CalendarDays, ScanFace, CreditCard } from "lucide-react";
 
 /** Animated counter that counts up from 0 → value */
 function CountUp({ to, duration = 1.5 }) {
@@ -63,27 +64,88 @@ export default function UserDashboard() {
           Membership: {dbUser?.paymentStatus || "—"}
         </Badge>
 
-        {/* Streak card */}
-        <Card>
-          <CardTitle className="flex items-center gap-2">
-            <Flame size={20} className="text-blood animate-pulse-red" />
-            Attendance Streak
-          </CardTitle>
-          <CardContent>
-            <span className="font-display text-6xl font-bold text-light">
-              <CountUp to={dbUser?.currentStreak || 0} />
-            </span>
-            <span className="ml-2 text-lg text-white/40">days</span>
-          </CardContent>
-        </Card>
+        {/* Membership details — shown when active */}
+        {dbUser?.paymentStatus === "active" && (
+          <Card>
+            <CardTitle>Membership Details</CardTitle>
+            <CardContent className="space-y-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-white/60">Plan:</span>
+                <span className="text-light font-semibold">
+                  {dbUser?.membershipPlan === "1month"
+                    ? "1 Month"
+                    : dbUser?.membershipPlan === "6months"
+                    ? "6 Months"
+                    : dbUser?.membershipPlan === "1year"
+                    ? "1 Year"
+                    : "—"}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-white/60">Membership Start:</span>
+                <span className="text-light font-semibold">
+                  {dbUser?.membershipStartDate ? new Date(dbUser.membershipStartDate).toLocaleDateString() : "—"}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-white/60">Membership End:</span>
+                <span className="text-light font-semibold">
+                  {dbUser?.membershipExpiry ? new Date(dbUser.membershipExpiry).toLocaleDateString() : "—"}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-        {/* Verify Face — primary CTA */}
-        <Link to="/verify" className="block">
-          <Button size="xl" className="w-full gap-3 text-lg">
-            <ScanFace size={24} />
-            Verify Face & Enter
-          </Button>
-        </Link>
+        {/* Days remaining box — shown when membership is active */}
+        {dbUser?.paymentStatus === "active" && dbUser?.membershipExpiry && (
+          <div className="flex justify-center">
+            <MembershipEndBox membershipExpiry={dbUser.membershipExpiry} />
+          </div>
+        )}
+
+        {/* Streak card — shown when membership is active */}
+        {dbUser?.paymentStatus === "active" && (
+          <Card>
+            <CardTitle className="flex items-center gap-2">
+              <Flame size={20} className="text-blood animate-pulse-red" />
+              Attendance Streak
+            </CardTitle>
+            <CardContent>
+              <span className="font-display text-6xl font-bold text-light">
+                <CountUp to={dbUser?.currentStreak || 0} />
+              </span>
+              <span className="ml-2 text-lg text-white/40">days</span>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Verify Face — primary CTA (shown when membership is active) */}
+        {dbUser?.paymentStatus === "active" && (
+          <Link to="/verify" className="block">
+            <Button size="xl" className="w-full gap-3 text-lg">
+              <ScanFace size={24} />
+              Verify Face & Enter
+            </Button>
+          </Link>
+        )}
+
+        {/* Get Membership CTA — shown when no active membership */}
+        {dbUser?.paymentStatus !== "active" && (
+          <Link to="/onboarding/membership" className="block">
+            <Button size="xl" className="w-full gap-3 text-lg bg-green-600 hover:bg-green-700">
+              <CreditCard size={24} />
+              Get Membership
+            </Button>
+          </Link>
+        )}
+
+        {/* No membership message */}
+        {dbUser?.paymentStatus !== "active" && (
+          <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-center text-sm text-yellow-400">
+            You don't have an active membership. Click "Get Membership" to choose a plan and activate your account.
+          </div>
+        )}
 
         {dbUser?.isBlocked && (
           <div className="rounded-xl border border-blood/30 bg-blood/10 px-4 py-3 text-center text-sm text-blood">

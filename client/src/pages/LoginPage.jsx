@@ -5,15 +5,26 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { motion } from "framer-motion";
+import { Chrome } from "lucide-react";
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  // Redirect after auth — all users go to dashboard first
+  const navigateAfterAuth = (user) => {
+    if (user.role === "admin") {
+      navigate("/admin");
+    } else {
+      navigate("/dashboard");
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -22,22 +33,25 @@ export default function LoginPage() {
 
     try {
       const user = await login(email, password);
-      
-      // Admin-only login check
-      if (user.role === "admin") {
-        navigate("/admin");
-      } else {
-        // Regular user - check if profile is complete
-        if (user.faceDescriptor && user.faceDescriptor.length === 128) {
-          navigate("/dashboard");
-        } else {
-          navigate("/complete-profile");
-        }
-      }
+      navigateAfterAuth(user);
     } catch (err) {
       setError(err.response?.data?.error || err.message || "Login failed");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setError("");
+    setGoogleLoading(true);
+
+    try {
+      const user = await loginWithGoogle();
+      navigateAfterAuth(user);
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || "Google sign-in failed");
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
@@ -70,7 +84,6 @@ export default function LoginPage() {
             <Input
               id="email"
               type="email"
-              placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -81,21 +94,40 @@ export default function LoginPage() {
             <Input
               id="password"
               type="password"
-              placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
             />
           </div>
           <Button type="submit" className="w-full" size="lg" disabled={loading}>
-            {loading ? "Signing in…" : "Sign In"}
+            {loading ? "Signing in…" : "Log In"}
           </Button>
         </form>
+
+        {/* Divider */}
+        <div className="my-6 flex items-center gap-3">
+          <div className="flex-1 border-t border-white/10" />
+          <span className="text-xs text-white/40">OR</span>
+          <div className="flex-1 border-t border-white/10" />
+        </div>
+
+        {/* Google Sign-In Button */}
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          size="lg"
+          disabled={googleLoading}
+          onClick={handleGoogleSignIn}
+        >
+          <Chrome className="mr-2 h-4 w-4" />
+          {googleLoading ? "Signing in…" : "Continue with Google"}
+        </Button>
 
         <p className="mt-6 text-center text-sm text-white/40">
           Don&apos;t have an account?{" "}
           <Link to="/register" className="text-blood hover:underline">
-            Register
+            Sign Up
           </Link>
         </p>
       </motion.div>

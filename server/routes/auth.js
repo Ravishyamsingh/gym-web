@@ -1,6 +1,6 @@
 const router = require("express").Router();
 const rateLimit = require("express-rate-limit");
-const { register, login } = require("../controllers/authController");
+const { register, login, checkUserExists, googleAuth } = require("../controllers/authController");
 
 // ── Rate limiter for public auth endpoints ──────────────────────
 // Prevents brute-force and abuse: max 5 requests per minute per IP.
@@ -16,5 +16,7 @@ const authLimiter = rateLimit({
 // and rate limiting protects against abuse.
 router.post("/register", authLimiter, register);
 router.post("/login", authLimiter, login);
+router.post("/google", authLimiter, googleAuth);
+router.get("/check-user", checkUserExists);
 
 module.exports = router;

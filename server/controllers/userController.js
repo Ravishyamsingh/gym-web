@@ -68,6 +68,7 @@ exports.updateFaceDescriptor = async (req, res, next) => {
     }
 
     req.dbUser.faceDescriptor = faceDescriptor;
+    req.dbUser.faceRegistered = true;
     await req.dbUser.save();
 
     return res.json({ message: "Face descriptor updated" });

@@ -15,19 +15,28 @@ export default function VerifyFace() {
   const [status, setStatus] = useState("idle"); // idle | loading | scanning | granted | denied
   const [message, setMessage] = useState("");
 
+  // Check if user has active membership
+  const hasActiveMembership = dbUser?.paymentStatus === "active";
+  const isFaceRegistered = dbUser?.faceRegistered === true;
+
   // ── Start camera & models ─────────────
   const startCamera = useCallback(async () => {
     setStatus("loading");
-    setMessage("Loading face models…");
+    setMessage("Starting camera…");
 
     try {
-      await loadFaceModels();
-
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user", width: 320, height: 240 },
+        video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
+        audio: false,
       });
       streamRef.current = stream;
-      if (videoRef.current) videoRef.current.srcObject = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play().catch(() => {});
+      }
+
+      setMessage("Loading face models…");
+      await loadFaceModels();
 
       setStatus("scanning");
       setMessage("Look directly at the camera");
@@ -99,6 +108,23 @@ export default function VerifyFace() {
       >
         <h1 className="font-display text-3xl font-bold uppercase tracking-tight">Verify Entry</h1>
         <p className="text-sm text-white/50">Your face is your membership card.</p>
+
+        {/* Membership check */}
+        {!hasActiveMembership && (
+          <div className="rounded-xl border border-blood/30 bg-blood/10 px-6 py-4">
+            <p className="text-sm text-blood font-semibold">
+              You don't have an active membership. Please activate your membership first.
+            </p>
+          </div>
+        )}
+
+        {hasActiveMembership && !isFaceRegistered && (
+          <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-6 py-4">
+            <p className="text-sm text-yellow-400 font-semibold">
+              Please complete face registration first.
+            </p>
+          </div>
+        )}
 
         {/* ── Video feed ─────────────────── */}
         <div className="relative mx-auto aspect-[4/3] w-full max-w-xs overflow-hidden rounded-xl border-2 border-white/10">

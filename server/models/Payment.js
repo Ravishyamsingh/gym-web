@@ -25,6 +25,13 @@ const paymentSchema = new mongoose.Schema(
       enum: ["paid", "pending", "overdue"],
       default: "pending",
     },
+    planId: {
+      type: String,
+      enum: ["1month", "6months", "1year"],
+    },
+    duration: {
+      type: String,
+    },
   },
   { timestamps: true }
 );
