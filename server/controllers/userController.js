@@ -78,6 +78,31 @@ exports.updateFaceDescriptor = async (req, res, next) => {
 };
 
 // ─────────────────────────────────────────────
+// GET /api/users/me/face-descriptor
+// Return the stored face descriptor for the authenticated user.
+// Used by the client-side verification flow to get a fresh copy
+// instead of relying on cached context data.
+// ─────────────────────────────────────────────
+exports.getFaceDescriptor = async (req, res, next) => {
+  try {
+    if (!req.dbUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (!req.dbUser.faceRegistered || !req.dbUser.faceDescriptor || req.dbUser.faceDescriptor.length !== 128) {
+      return res.status(404).json({ error: "No face descriptor registered" });
+    }
+
+    return res.json({
+      faceDescriptor: req.dbUser.faceDescriptor,
+      faceRegistered: req.dbUser.faceRegistered,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ─────────────────────────────────────────────
 // PUT /api/users/:id/payment-status
 // Admin-only: update a user's payment status.
 // ─────────────────────────────────────────────

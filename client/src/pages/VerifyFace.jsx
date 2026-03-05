@@ -3,7 +3,12 @@ import { useAuth } from "@/context/AuthContext";
 import UserLayout from "@/components/layout/UserLayout";
 import { Button } from "@/components/ui/Button";
 import { motion, AnimatePresence } from "framer-motion";
-import { loadFaceModels, extractDescriptor, compareDescriptors } from "@/lib/faceApi";
+import {
+  loadFaceModels,
+  extractBestDescriptor,
+  normalizeDescriptor,
+  compareDescriptors,
+} from "@/lib/faceApi";
 import api from "@/lib/api";
 import { ScanFace, CheckCircle2, XCircle } from "lucide-react";
 
@@ -11,13 +16,30 @@ export default function VerifyFace() {
   const { dbUser, refreshProfile } = useAuth();
   const videoRef = useRef(null);
   const streamRef = useRef(null);
+  const storedDescriptorRef = useRef(null); // Fresh copy from server
 
-  const [status, setStatus] = useState("idle"); // idle | loading | scanning | granted | denied
+  const [status, setStatus] = useState("idle"); // idle | loading | scanning | verifying | granted | denied
   const [message, setMessage] = useState("");
 
   // Check if user has active membership
   const hasActiveMembership = dbUser?.paymentStatus === "active";
   const isFaceRegistered = dbUser?.faceRegistered === true;
+
+  // ── Fetch stored descriptor from server (fresh copy) ─────
+  const fetchStoredDescriptor = async () => {
+    try {
+      const { data } = await api.get("/users/me/face-descriptor");
+      const normalized = normalizeDescriptor(data.faceDescriptor);
+      if (!normalized) {
+        throw new Error("Invalid stored descriptor");
+      }
+      storedDescriptorRef.current = normalized;
+      return true;
+    } catch (err) {
+      console.error("Failed to fetch stored descriptor:", err);
+      return false;
+    }
+  };
 
   // ── Start camera & models ─────────────
   const startCamera = useCallback(async () => {
@@ -25,6 +47,15 @@ export default function VerifyFace() {
     setMessage("Starting camera…");
 
     try {
+      // Fetch stored face descriptor from server first
+      setMessage("Loading face data…");
+      const hasDescriptor = await fetchStoredDescriptor();
+      if (!hasDescriptor) {
+        setStatus("denied");
+        setMessage("No baseline face on file. Please complete face registration first.");
+        return;
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
         audio: false,
@@ -39,10 +70,10 @@ export default function VerifyFace() {
       await loadFaceModels();
 
       setStatus("scanning");
-      setMessage("Look directly at the camera");
+      setMessage("Look directly at the camera, then tap Verify");
     } catch {
       setStatus("denied");
-      setMessage("Camera access denied or models failed to load.");
+      setMessage("Camera access denied or face models failed to load.");
     }
   }, []);
 
@@ -54,27 +85,41 @@ export default function VerifyFace() {
     return () => stopCamera();
   }, []);
 
-  // ── Verify face ───────────────────────
+  // ── Verify face (multi-sample for accuracy) ───────────────────────
   const handleVerify = async () => {
-    setMessage("Analysing…");
+    setStatus("verifying");
+    setMessage("Analysing your face…");
 
     try {
-      const liveDescriptor = await extractDescriptor(videoRef.current);
-      if (!liveDescriptor) {
-        setMessage("No face detected — try again.");
+      // Use multi-sample extraction for more reliable verification
+      const result = await extractBestDescriptor(
+        videoRef.current,
+        3,    // numSamples — fewer than registration since speed matters
+        300,  // delayMs
+        (progress) => {
+          setMessage(
+            `Scanning ${progress.current}/${progress.total}` +
+            (progress.score !== null ? ` (quality: ${Math.round(progress.score * 100)}%)` : "")
+          );
+        }
+      );
+
+      if (!result) {
+        setStatus("scanning");
+        setMessage("No face detected — reposition and try again.");
         return;
       }
 
-      // Compare against stored descriptor
-      const saved = dbUser?.faceDescriptor;
-      if (!saved || saved.length !== 128) {
+      // Compare against the fresh stored descriptor from server
+      const stored = storedDescriptorRef.current;
+      if (!stored) {
         setStatus("denied");
         setMessage("No baseline face on file. Please re-register.");
         stopCamera();
         return;
       }
 
-      const { match, distance } = compareDescriptors(liveDescriptor, saved);
+      const { match, distance } = compareDescriptors(result.descriptor, stored);
 
       if (!match) {
         setStatus("denied");
@@ -84,6 +129,7 @@ export default function VerifyFace() {
       }
 
       // Face matched — call the backend to log attendance
+      setMessage("Face matched! Logging check-in…");
       const { data } = await api.post("/attendance");
       await refreshProfile();
 
@@ -130,7 +176,7 @@ export default function VerifyFace() {
         <div className="relative mx-auto aspect-[4/3] w-full max-w-xs overflow-hidden rounded-xl border-2 border-white/10">
           <video ref={videoRef} autoPlay muted playsInline className="h-full w-full object-cover" />
 
-          {status === "loading" && (
+          {(status === "loading" || status === "verifying") && (
             <div className="absolute inset-0 flex items-center justify-center bg-void/80">
               <div className="h-8 w-8 animate-spin rounded-full border-4 border-blood border-t-transparent" />
             </div>
@@ -167,7 +213,7 @@ export default function VerifyFace() {
 
         {/* ── Action buttons ─────────────── */}
         {status === "idle" && (
-          <Button size="xl" className="w-full gap-3" onClick={startCamera}>
+          <Button size="xl" className="w-full gap-3" onClick={startCamera} disabled={!hasActiveMembership || !isFaceRegistered}>
             <ScanFace size={24} />
             Open Camera
           </Button>
@@ -186,6 +232,7 @@ export default function VerifyFace() {
             size="lg"
             className="w-full"
             onClick={() => {
+              storedDescriptorRef.current = null;
               setStatus("idle");
               setMessage("");
             }}

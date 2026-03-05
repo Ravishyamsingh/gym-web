@@ -52,13 +52,85 @@ export async function extractDescriptor(input) {
 }
 
 /**
+ * Minimum detection confidence to consider a face capture reliable.
+ */
+const MIN_CONFIDENCE = 0.85;
+
+/**
+ * Extract the best face descriptor from multiple samples.
+ * Takes `numSamples` readings, filters by minimum confidence,
+ * and returns the descriptor with the highest detection score.
+ *
+ * @param {HTMLVideoElement} input
+ * @param {number} numSamples — number of capture attempts (default 5)
+ * @param {number} delayMs    — interval between captures (default 400ms)
+ * @param {(progress: {current: number, total: number, score: number | null}) => void} onProgress
+ * @returns {Promise<{descriptor: Float32Array, score: number} | null>}
+ */
+export async function extractBestDescriptor(input, numSamples = 5, delayMs = 400, onProgress) {
+  let bestDescriptor = null;
+  let bestScore = 0;
+
+  for (let i = 0; i < numSamples; i++) {
+    const detection = await faceapi
+      .detectSingleFace(input)
+      .withFaceLandmarks()
+      .withFaceDescriptor();
+
+    const score = detection?.detection?.score ?? 0;
+
+    if (onProgress) {
+      onProgress({ current: i + 1, total: numSamples, score: detection ? score : null });
+    }
+
+    if (detection && score > MIN_CONFIDENCE && score > bestScore) {
+      bestScore = score;
+      bestDescriptor = detection.descriptor;
+    }
+
+    // wait between samples so the user can adjust slightly
+    if (i < numSamples - 1) {
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+
+  return bestDescriptor ? { descriptor: bestDescriptor, score: bestScore } : null;
+}
+
+/**
+ * Convert a face descriptor (Float32Array or number[]) to a plain JS number array
+ * suitable for JSON serialization and MongoDB storage.
+ * Ensures every value is a finite number.
+ */
+export function descriptorToArray(descriptor) {
+  const arr = Array.from(descriptor).map(Number);
+  if (arr.length !== 128 || !arr.every(Number.isFinite)) {
+    throw new Error("Invalid descriptor: expected 128 finite numbers");
+  }
+  return arr;
+}
+
+/**
+ * Normalize a stored descriptor (plain number[] from DB) into a Float32Array
+ * for accurate Euclidean distance comparison.
+ */
+export function normalizeDescriptor(stored) {
+  if (!stored || !Array.isArray(stored) || stored.length !== 128) return null;
+  return new Float32Array(stored);
+}
+
+/**
  * Compare two face descriptors using Euclidean distance.
+ * Handles both Float32Array and plain number[] inputs.
  * @param {Float32Array | number[]} d1
  * @param {Float32Array | number[]} d2
  * @param {number} threshold  — default 0.6 (lower = stricter)
  * @returns {{ match: boolean, distance: number }}
  */
 export function compareDescriptors(d1, d2, threshold = 0.6) {
-  const distance = faceapi.euclideanDistance(d1, d2);
+  // Ensure both are Float32Array for consistent precision
+  const a = d1 instanceof Float32Array ? d1 : new Float32Array(d1);
+  const b = d2 instanceof Float32Array ? d2 : new Float32Array(d2);
+  const distance = faceapi.euclideanDistance(a, b);
   return { match: distance < threshold, distance };
 }

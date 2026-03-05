@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/Button";
 import { motion } from "framer-motion";
-import { loadFaceModels, extractDescriptor } from "@/lib/faceApi";
+import { loadFaceModels, extractBestDescriptor, descriptorToArray } from "@/lib/faceApi";
 import api from "@/lib/api";
 import { ScanFace } from "lucide-react";
 
@@ -15,6 +15,7 @@ export default function FaceRegistrationPage() {
   const [loading, setLoading] = useState(false);
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const [cameraStarted, setCameraStarted] = useState(false);
+  const [captureProgress, setCaptureProgress] = useState(null); // { current, total, score }
 
   const videoRef = useRef(null);
   const streamRef = useRef(null);
@@ -75,32 +76,48 @@ export default function FaceRegistrationPage() {
     setCameraStarted(false);
   };
 
-  // ── Capture face descriptor ───────────────
+  // ── Capture face descriptor (multi-sample for reliability) ───────────────
   const handleCapture = async () => {
     setError("");
     setLoading(true);
+    setCaptureProgress(null);
 
     try {
-      const descriptor = await extractDescriptor(videoRef.current);
-      if (!descriptor) {
-        setError("No face detected. Please look directly at the camera and try again.");
+      // Take 5 samples and pick the best quality detection
+      const result = await extractBestDescriptor(
+        videoRef.current,
+        5,    // numSamples
+        400,  // delayMs between samples
+        (progress) => setCaptureProgress(progress)
+      );
+
+      if (!result) {
+        setError(
+          "No reliable face detected. Please ensure good lighting, look directly at the camera, and try again."
+        );
+        setCaptureProgress(null);
         setLoading(false);
         return;
       }
 
-      // Update face descriptor
+      // Convert Float32Array to plain number array for JSON/MongoDB storage
+      const descriptorArray = descriptorToArray(result.descriptor);
+
+      // Update face descriptor on server
       await api.put("/users/me/face-descriptor", {
-        faceDescriptor: Array.from(descriptor),
+        faceDescriptor: descriptorArray,
       });
 
       // Refresh profile to update context
       await refreshProfile();
       stopCamera();
+      setCaptureProgress(null);
 
       // Redirect to dashboard
       navigate("/dashboard");
     } catch (err) {
       setError(err.response?.data?.error || err.message || "Failed to save face");
+      setCaptureProgress(null);
     } finally {
       setLoading(false);
     }
@@ -155,6 +172,24 @@ export default function FaceRegistrationPage() {
                   {!modelsLoaded && (
                     <div className="absolute inset-0 flex items-center justify-center bg-void/80">
                       <div className="h-8 w-8 animate-spin rounded-full border-4 border-blood border-t-transparent" />
+                    </div>
+                  )}
+                  {captureProgress && (
+                    <div className="absolute bottom-0 inset-x-0 bg-void/80 px-3 py-2 text-center">
+                      <p className="text-xs text-white/80">
+                        Scanning {captureProgress.current}/{captureProgress.total}
+                        {captureProgress.score !== null && (
+                          <span className="ml-2 text-emerald-400">
+                            Quality: {Math.round(captureProgress.score * 100)}%
+                          </span>
+                        )}
+                      </p>
+                      <div className="mt-1 h-1 w-full rounded bg-white/10">
+                        <div
+                          className="h-1 rounded bg-blood transition-all"
+                          style={{ width: `${(captureProgress.current / captureProgress.total) * 100}%` }}
+                        />
+                      </div>
                     </div>
                   )}
                 </div>

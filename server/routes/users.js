@@ -5,10 +5,12 @@ const {
   getAllUsers,
   toggleBlock,
   updateFaceDescriptor,
+  getFaceDescriptor,
 } = require("../controllers/userController");
 
 // Authenticated user routes
 router.get("/me", verifyToken, getMe);
+router.get("/me/face-descriptor", verifyToken, getFaceDescriptor);
 router.put("/me/face-descriptor", verifyToken, updateFaceDescriptor);
 
 // Admin-only routes
