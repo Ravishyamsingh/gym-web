@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo, useCallback } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
@@ -18,7 +18,6 @@ import {
   Mail,
   Shield,
   Activity,
-  BarChart3,
   RefreshCw,
   ArrowRight,
   CheckCircle2,
@@ -26,7 +25,6 @@ import {
   Zap,
   Target,
   Calendar,
-  Dumbbell,
 } from "lucide-react";
 
 /* ================================================================
@@ -86,12 +84,10 @@ function useMembershipProgress(startDate, expiryDate) {
   }, [startDate, expiryDate]);
 }
 
-const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const MONTH_FULL = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
-const DAY_LABELS = ["Mon", "", "Wed", "", "Fri", "", ""];
 
 /* ================================================================
    ANIMATIONS
@@ -135,249 +131,159 @@ function ProgressRing({ progress, size = 140, strokeWidth = 8, children }) {
 }
 
 /* ================================================================
-   MINI BAR CHART — 6-month overview
+   MONTHLY STREAK CALENDAR — circle-per-day, current month only
    ================================================================ */
 
-function MonthCards({ data }) {
-  return (
-    <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
-      {data.map((d, i) => (
-        <motion.div
-          key={i}
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.35, delay: i * 0.06 }}
-          className="bg-white/[0.04] border border-white/10 rounded-xl p-3 sm:p-4 text-center hover:border-blood/30 hover:bg-white/[0.06] transition-all duration-300"
-        >
-          <p className="text-xs font-semibold text-white/70 uppercase tracking-wider">{d.label}</p>
-          <p className="text-2xl sm:text-3xl font-bold font-display text-white mt-1.5">{d.count}</p>
-          <p className="text-xs text-white/55 mt-0.5">visits</p>
-        </motion.div>
-      ))}
-    </div>
-  );
-}
+function MonthlyStreakCalendar({ records }) {
+  const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-/* ================================================================
-   GITHUB-STYLE ATTENDANCE HEATMAP — last 6 months
-   ================================================================ */
+  const { days, monthLabel, year, attended, totalDays, todayDate, streakCount } = useMemo(() => {
+    const now = new Date();
+    const yr = now.getFullYear();
+    const mo = now.getMonth();
+    const todayDate = now.getDate();
+    const totalDays = new Date(yr, mo + 1, 0).getDate();
+    const firstDayOfWeek = new Date(yr, mo, 1).getDay(); // 0=Sun
 
-function AttendanceHeatmap({ records }) {
-  const [tooltip, setTooltip] = useState(null);
-
-  const attendedDates = useMemo(() => {
-    const set = new Set();
+    // Build set of attended dates for this month
+    const attendedDates = new Set();
     records.forEach((r) => {
       const d = new Date(r.timestamp);
-      set.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
+      if (d.getFullYear() === yr && d.getMonth() === mo) {
+        attendedDates.add(d.getDate());
+      }
     });
-    return set;
+
+    // Calculate current streak (consecutive attended days ending at today or yesterday)
+    let streakCount = 0;
+    for (let d = todayDate; d >= 1; d--) {
+      if (attendedDates.has(d)) {
+        streakCount++;
+      } else if (d === todayDate) {
+        // today might not be attended yet, check yesterday
+        continue;
+      } else {
+        break;
+      }
+    }
+
+    // Build day cells including leading blanks for alignment
+    const days = [];
+    // Add blank cells for days before the 1st
+    for (let i = 0; i < firstDayOfWeek; i++) {
+      days.push({ day: null, attended: false, isFuture: false, isToday: false });
+    }
+    // Add actual days
+    for (let d = 1; d <= totalDays; d++) {
+      days.push({
+        day: d,
+        attended: attendedDates.has(d),
+        isFuture: d > todayDate,
+        isToday: d === todayDate,
+      });
+    }
+
+    return {
+      days,
+      monthLabel: MONTH_FULL[mo],
+      year: yr,
+      attended: attendedDates.size,
+      totalDays,
+      todayDate,
+      streakCount,
+    };
   }, [records]);
 
-  const { months, totalAttended } = useMemo(() => {
-    const now = new Date();
-    const months = [];
-    let totalAttended = 0;
-
-    for (let m = 5; m >= 0; m--) {
-      const monthDate = new Date(now.getFullYear(), now.getMonth() - m, 1);
-      const year = monthDate.getFullYear();
-      const month = monthDate.getMonth();
-      const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-      const days = [];
-      let monthAttended = 0;
-      for (let d = 1; d <= daysInMonth; d++) {
-        const date = new Date(year, month, d);
-        const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-        const attended = attendedDates.has(key);
-        const isFuture = date > now;
-        if (attended) { monthAttended++; totalAttended++; }
-        days.push({ date, key, day: d, dayOfWeek: date.getDay(), attended, isFuture });
-      }
-
-      const weeks = [];
-      let currentWeek = new Array(7).fill(null);
-      days.forEach((dayObj) => {
-        const idx = dayObj.dayOfWeek === 0 ? 6 : dayObj.dayOfWeek - 1;
-        currentWeek[idx] = dayObj;
-        if (idx === 6) { weeks.push(currentWeek); currentWeek = new Array(7).fill(null); }
-      });
-      if (currentWeek.some((c) => c !== null)) weeks.push(currentWeek);
-
-      months.push({ label: MONTH_SHORT[month], year, month, weeks, attended: monthAttended, total: daysInMonth });
-    }
-    return { months, totalAttended };
-  }, [attendedDates]);
-
-  const getCellColor = useCallback((day) => {
-    if (!day) return "bg-transparent";
-    if (day.isFuture) return "bg-white/[0.03]";
-    if (day.attended) return "bg-emerald-500";
-    return "bg-white/[0.06]";
-  }, []);
-
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Calendar size={18} className="text-emerald-400" />
-          <span className="text-base font-semibold text-white">Attendance Heatmap</span>
+        <div className="flex items-center gap-2.5">
+          <Calendar size={20} className="text-blood" />
+          <span className="text-lg font-bold font-display text-white uppercase tracking-tight">
+            {monthLabel} {year}
+          </span>
         </div>
-        <span className="text-sm text-white/70 font-medium">{totalAttended} days total</span>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-white/60">
+            <span className="font-semibold text-emerald-400">{attended}</span>/{totalDays} days
+          </span>
+          {streakCount > 0 && (
+            <span className="inline-flex items-center gap-1 bg-orange-500/15 border border-orange-500/30 rounded-full px-2.5 py-1 text-xs font-semibold text-orange-400">
+              <Flame size={12} /> {streakCount}
+            </span>
+          )}
+        </div>
       </div>
 
-      {/* Scrollable grid */}
-      <div className="overflow-x-auto pb-2 -mx-2 px-2">
-        <div className="inline-flex gap-4 min-w-max">
-          {/* Day labels */}
-          <div className="flex flex-col gap-[3px] pt-[20px] shrink-0">
-            {DAY_LABELS.map((label, i) => (
-              <div key={i} className="h-[14px] flex items-center">
-                <span className="text-xs text-white/55 w-8 text-right pr-1">{label}</span>
-              </div>
-            ))}
+      {/* Weekday headers */}
+      <div className="grid grid-cols-7 gap-2">
+        {WEEKDAYS.map((wd) => (
+          <div key={wd} className="text-center text-xs font-semibold text-white/40 uppercase tracking-wider pb-1">
+            {wd}
           </div>
+        ))}
+      </div>
 
-          {months.map((m) => (
-            <div key={`${m.year}-${m.month}`} className="flex flex-col shrink-0">
-              <div className="text-xs text-white/65 mb-1.5 text-center font-medium">{m.label}</div>
-              <div className="flex gap-[3px]">
-                {m.weeks.map((week, wi) => (
-                  <div key={wi} className="flex flex-col gap-[3px]">
-                    {week.map((day, di) => (
-                      <div
-                        key={di}
-                        className={`w-[14px] h-[14px] rounded-[3px] transition-all duration-200 relative ${getCellColor(day)} ${
-                          day && !day.isFuture ? "hover:ring-1 hover:ring-white/30 hover:scale-125 cursor-default" : ""
-                        }`}
-                        onMouseEnter={() => {
-                          if (day && !day.isFuture)
-                            setTooltip({
-                              key: day.key,
-                              text: `${day.date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} — ${day.attended ? "Attended ✓" : "Missed"}`,
-                            });
-                        }}
-                        onMouseLeave={() => setTooltip(null)}
-                      >
-                        {tooltip && day && tooltip.key === day.key && (
-                          <div className="absolute z-50 -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap bg-void border border-white/10 rounded-md px-2.5 py-1 text-xs text-white shadow-xl pointer-events-none">
-                            {tooltip.text}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ))}
+      {/* Day circles */}
+      <div className="grid grid-cols-7 gap-2">
+        {days.map((cell, idx) => {
+          if (cell.day === null) {
+            return <div key={`blank-${idx}`} />;
+          }
+
+          // Determine circle style
+          let circleClass = "";
+          let labelClass = "text-white/25";
+
+          if (cell.isFuture) {
+            circleClass = "bg-white/[0.04] border border-white/[0.06]";
+            labelClass = "text-white/20";
+          } else if (cell.attended) {
+            circleClass = "bg-emerald-500 shadow-md shadow-emerald-500/25";
+            labelClass = "text-white font-semibold";
+          } else {
+            circleClass = "bg-white/[0.06] border border-white/10";
+            labelClass = "text-white/40";
+          }
+
+          if (cell.isToday) {
+            circleClass += " ring-2 ring-blood ring-offset-1 ring-offset-surface";
+          }
+
+          return (
+            <motion.div
+              key={cell.day}
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.25, delay: idx * 0.012 }}
+              className="flex flex-col items-center"
+            >
+              <div
+                className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-200 ${circleClass} ${
+                  !cell.isFuture ? "hover:scale-110" : ""
+                }`}
+              >
+                <span className={`text-xs sm:text-sm leading-none ${labelClass}`}>{cell.day}</span>
               </div>
-              <div className="text-[10px] text-white/50 text-center mt-1.5">{m.attended}/{m.total}</div>
-            </div>
-          ))}
-        </div>
+            </motion.div>
+          );
+        })}
       </div>
 
       {/* Legend */}
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-white/55">Past 6 months</span>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-white/55">Missed</span>
-          <div className="w-3 h-3 rounded-[3px] bg-white/[0.06]" />
-          <div className="w-3 h-3 rounded-[3px] bg-emerald-500/40" />
-          <div className="w-3 h-3 rounded-[3px] bg-emerald-500" />
-          <span className="text-xs text-white/55">Attended</span>
+      <div className="flex items-center justify-center gap-5 pt-1">
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded-full bg-emerald-500" />
+          <span className="text-xs text-white/50">Attended</span>
         </div>
-      </div>
-    </div>
-  );
-}
-
-/* ================================================================
-   MONTHLY ATTENDANCE DONUT CHART
-   ================================================================ */
-
-function MonthlyAttendanceChart({ records }) {
-  const { attended, totalDays, daysPassed, percentage, monthLabel } = useMemo(() => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth();
-    const totalDays = new Date(year, month + 1, 0).getDate();
-    const daysPassed = now.getDate();
-    const monthLabel = MONTH_FULL[month];
-
-    const monthStart = new Date(year, month, 1);
-    const monthEnd = new Date(year, month + 1, 0, 23, 59, 59, 999);
-
-    const uniqueDays = new Set();
-    records.forEach((r) => {
-      const ts = new Date(r.timestamp);
-      if (ts >= monthStart && ts <= monthEnd) uniqueDays.add(ts.toDateString());
-    });
-    const attended = uniqueDays.size;
-    const percentage = daysPassed > 0 ? Math.round((attended / daysPassed) * 100) : 0;
-    return { attended, totalDays, daysPassed, percentage, monthLabel };
-  }, [records]);
-
-  const size = 120;
-  const strokeWidth = 10;
-  const r = (size - strokeWidth) / 2;
-  const circ = 2 * Math.PI * r;
-  const filledRatio = totalDays > 0 ? attended / totalDays : 0;
-  const offset = circ - filledRatio * circ;
-  const color = percentage >= 80 ? "#22c55e" : percentage >= 50 ? "#eab308" : "#ef4444";
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <Dumbbell size={18} className="text-blood" />
-        <span className="text-base font-semibold text-white">{monthLabel} Attendance</span>
-      </div>
-
-      <div className="flex items-center gap-6">
-        {/* Donut ring */}
-        <div className="relative shrink-0" style={{ width: size, height: size }}>
-          <svg width={size} height={size} className="-rotate-90">
-            <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={strokeWidth} />
-            <motion.circle
-              cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color}
-              strokeWidth={strokeWidth} strokeLinecap="round" strokeDasharray={circ}
-              initial={{ strokeDashoffset: circ }}
-              animate={{ strokeDashoffset: offset }}
-              transition={{ duration: 1.2, ease: "easeOut", delay: 0.4 }}
-            />
-          </svg>
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-2xl font-bold font-display text-white">{attended}</span>
-            <span className="text-xs text-white/60 -mt-0.5">/{totalDays}</span>
-          </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded-full bg-white/[0.06] border border-white/10" />
+          <span className="text-xs text-white/50">Missed</span>
         </div>
-
-        {/* Stats */}
-        <div className="flex-1 space-y-3 min-w-0">
-          <div>
-            <div className="flex justify-between text-sm text-white/70 mb-1.5">
-              <span>Attendance Rate</span>
-              <span className="font-semibold text-white">{percentage}%</span>
-            </div>
-            <div className="h-2 bg-white/5 rounded-full overflow-hidden">
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${percentage}%` }}
-                transition={{ duration: 1, ease: "easeOut", delay: 0.5 }}
-                className="h-full rounded-full"
-                style={{ backgroundColor: color }}
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-white/[0.04] rounded-lg px-3 py-2 text-center">
-              <p className="text-lg font-bold font-display text-emerald-400">{attended}</p>
-              <p className="text-xs text-white/65 mt-0.5">Attended</p>
-            </div>
-            <div className="bg-white/[0.04] rounded-lg px-3 py-2 text-center">
-              <p className="text-lg font-bold font-display text-white/60">{daysPassed - attended}</p>
-              <p className="text-xs text-white/65 mt-0.5">Missed</p>
-            </div>
-          </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded-full ring-2 ring-blood ring-offset-1 ring-offset-surface bg-white/[0.06]" />
+          <span className="text-xs text-white/50">Today</span>
         </div>
       </div>
     </div>
@@ -404,26 +310,7 @@ export default function UserDashboard() {
       .finally(() => setLoadingAtt(false));
   }, [isActive]);
 
-  const chartData = useMemo(() => {
-    const months = [];
-    const now = new Date();
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const match = attendance.monthlyCounts.find((m) => m._id.year === d.getFullYear() && m._id.month === d.getMonth() + 1);
-      months.push({ label: MONTH_SHORT[d.getMonth()], count: match ? match.count : 0 });
-    }
-    return months;
-  }, [attendance.monthlyCounts]);
-
   const statusVariant = isActive ? "active" : dbUser?.paymentStatus === "pending" ? "pending" : "expired";
-
-  const streakMsg = (s) => {
-    if (s === 0) return "Start your streak today!";
-    if (s < 3) return "Keep it going — momentum is building!";
-    if (s < 7) return "Great consistency this week!";
-    if (s < 14) return "You're on fire — unstoppable!";
-    return "Legendary dedication! 💪";
-  };
 
   /* ================================================================
      RENDER
@@ -627,86 +514,22 @@ export default function UserDashboard() {
               </motion.div>
 
               {/* ──────────────────────────────────────────────
-                  ROW 4 — 6-MONTH OVERVIEW CHART (full width)
+                  ROW 4 — MONTHLY STREAK CALENDAR (full width)
                  ────────────────────────────────────────────── */}
               <motion.div variants={fadeUp} custom={3}>
-                <Card className="border-white/8">
-                  <CardTitle className="flex items-center gap-2 mb-5">
-                    <BarChart3 size={20} className="text-blood" />
-                    6-Month Attendance Overview
-                  </CardTitle>
-                  <CardContent>
-                    {loadingAtt ? (
-                      <div className="h-44 flex items-center justify-center text-white/50 text-sm">Loading...</div>
-                    ) : (
-                      <MonthCards data={chartData} />
-                    )}
-                  </CardContent>
+                <Card className="border-white/8 bg-gradient-to-br from-emerald-500/[0.03] to-surface">
+                  {loadingAtt ? (
+                    <div className="h-64 flex items-center justify-center text-white/50 text-sm">Loading calendar...</div>
+                  ) : (
+                    <MonthlyStreakCalendar records={attendance.records} />
+                  )}
                 </Card>
               </motion.div>
 
               {/* ──────────────────────────────────────────────
-                  ROW 5 — STREAK (full width)
+                  ROW 5 — VERIFY FACE CTA (full width)
                  ────────────────────────────────────────────── */}
               <motion.div variants={fadeUp} custom={4}>
-                <Card className="border-white/8 bg-gradient-to-br from-orange-500/5 to-surface">
-                  <div className="flex flex-col sm:flex-row items-center gap-6 sm:gap-8">
-                    {/* Streak icon + number */}
-                    <div className="flex items-center gap-4">
-                      <motion.div
-                        animate={(dbUser?.currentStreak || 0) > 0 ? { scale: [1, 1.2, 1], rotate: [0, 5, -5, 0] } : {}}
-                        transition={(dbUser?.currentStreak || 0) > 0 ? { duration: 1.5, repeat: Infinity, repeatDelay: 1 } : {}}
-                        className="h-14 w-14 rounded-xl bg-orange-500/15 flex items-center justify-center shrink-0"
-                      >
-                        <Flame size={28} className="text-orange-400" />
-                      </motion.div>
-                      <div>
-                        <span className="font-display text-5xl sm:text-6xl font-bold text-white block leading-none">
-                          <CountUp to={dbUser?.currentStreak || 0} />
-                        </span>
-                        <span className="text-sm text-white/70 mt-1 block leading-relaxed">consecutive days</span>
-                      </div>
-                    </div>
-                    {/* Divider */}
-                    <div className="hidden sm:block w-px h-16 bg-white/8" />
-                    <div className="sm:hidden w-full h-px bg-white/8" />
-                    {/* Message */}
-                    <div className="flex-1 text-center sm:text-left">
-                      <p className="text-base text-white/70 italic leading-relaxed">{streakMsg(dbUser?.currentStreak || 0)}</p>
-                    </div>
-                  </div>
-                </Card>
-              </motion.div>
-
-              {/* ──────────────────────────────────────────────
-                  ROW 6 — HEATMAP + MONTHLY CHART (50/50)
-                 ────────────────────────────────────────────── */}
-              <motion.div variants={fadeUp} custom={5}>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {/* Heatmap */}
-                  <Card className="border-white/8 bg-gradient-to-br from-emerald-500/[0.03] to-surface">
-                    {loadingAtt ? (
-                      <div className="h-52 flex items-center justify-center text-white/50 text-sm">Loading heatmap...</div>
-                    ) : (
-                      <AttendanceHeatmap records={attendance.records} />
-                    )}
-                  </Card>
-
-                  {/* Monthly donut */}
-                  <Card className="border-white/8">
-                    {loadingAtt ? (
-                      <div className="h-52 flex items-center justify-center text-white/50 text-sm">Loading chart...</div>
-                    ) : (
-                      <MonthlyAttendanceChart records={attendance.records} />
-                    )}
-                  </Card>
-                </div>
-              </motion.div>
-
-              {/* ──────────────────────────────────────────────
-                  ROW 7 — VERIFY FACE CTA (full width)
-                 ────────────────────────────────────────────── */}
-              <motion.div variants={fadeUp} custom={6}>
                 <Link to="/verify" className="block">
                   <motion.div whileHover={{ scale: 1.01, y: -2 }} whileTap={{ scale: 0.98 }}>
                     <Card className="p-0 overflow-hidden border-blood/30 bg-gradient-to-r from-blood/15 via-blood/10 to-surface hover:border-blood/50 transition-all duration-300 cursor-pointer group">
@@ -726,9 +549,9 @@ export default function UserDashboard() {
               </motion.div>
 
               {/* ──────────────────────────────────────────────
-                  ROW 8 — QUICK ACTIONS + TIMELINE (side by side)
+                  ROW 6 — QUICK ACTIONS + TIMELINE (side by side)
                  ────────────────────────────────────────────── */}
-              <motion.div variants={fadeUp} custom={7}>
+              <motion.div variants={fadeUp} custom={5}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Quick Actions */}
                   <div>
