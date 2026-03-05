@@ -4,7 +4,7 @@
 
 ### Prerequisites
 - Node.js v18+
-- MongoDB Atlas account (or local MongoDB)
+- MongoDB Atlas account (or local MongoDB) for database 
 - Firebase project with Authentication enabled
 
 ### Backend
