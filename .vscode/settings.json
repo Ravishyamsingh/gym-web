@@ -3,6 +3,7 @@
         "/^node d:\\\\gymweb\\\\server\\\\server\\.js$/": {
             "approve": true,
             "matchCommandLine": true
+            
         }
     }
 }
