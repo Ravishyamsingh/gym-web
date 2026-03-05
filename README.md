@@ -13,6 +13,7 @@ cd server
 npm install
 # Copy .env.example → .env and fill in your values
 npm run dev
+npm run start
 ```
 
 ### Frontend
@@ -20,6 +21,7 @@ npm run dev
 cd client
 npm install
 npm run dev
+npm run start
 ```
 
 Open [http://localhost:5173](http://localhost:5173) in your browser.
