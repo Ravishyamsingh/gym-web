@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 
 /**
- * Displays a styled square box showing days remaining until membership expiry.
- * Dynamically calculates based on current date and membership end date.
+ * Compact status widget showing days remaining until membership expiry.
+ * Positioned as a top-right corner widget.
  */
 export default function MembershipEndBox({ membershipExpiry }) {
   const [daysRemaining, setDaysRemaining] = useState(0);
@@ -41,7 +41,7 @@ export default function MembershipEndBox({ membershipExpiry }) {
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.3 }}
-      className={`flex flex-col items-center justify-center w-32 h-32 rounded-lg font-bold text-center transition-all ${
+      className={`flex flex-col items-center justify-center w-28 h-28 rounded-lg font-bold text-center transition-all ${
         isExpired
           ? "bg-blood/20 border-2 border-blood text-blood"
           : isExpiringSoon
@@ -49,9 +49,9 @@ export default function MembershipEndBox({ membershipExpiry }) {
           : "bg-green-500/20 border-2 border-green-500 text-green-400"
       }`}
     >
-      <div className="text-sm uppercase tracking-wider opacity-75">END</div>
-      <div className="text-4xl font-display mt-2">{daysRemaining}</div>
-      <div className="text-xs uppercase tracking-wider opacity-75 mt-1">
+      <div className="text-xs uppercase tracking-wider opacity-75 font-semibold">END</div>
+      <div className="text-3xl font-display mt-1.5 font-bold">{daysRemaining}</div>
+      <div className="text-[10px] uppercase tracking-wider opacity-75 mt-1">
         {daysRemaining === 1 ? "day" : "days"}
       </div>
     </motion.div>

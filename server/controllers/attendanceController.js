@@ -59,6 +59,53 @@ exports.checkIn = async (req, res, next) => {
 };
 
 // ─────────────────────────────────────────────
+// GET /api/attendance/my
+// User: return the logged-in user's own attendance history.
+// ─────────────────────────────────────────────
+exports.getMyAttendance = async (req, res, next) => {
+  try {
+    const user = req.dbUser;
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const records = await Attendance.find({ userId: user._id })
+      .sort({ timestamp: -1 })
+      .limit(90); // last ~3 months
+
+    // Build monthly summary for chart (last 6 months)
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    sixMonthsAgo.setDate(1);
+    sixMonthsAgo.setHours(0, 0, 0, 0);
+
+    const monthlyCounts = await Attendance.aggregate([
+      { $match: { userId: user._id, timestamp: { $gte: sixMonthsAgo } } },
+      {
+        $group: {
+          _id: {
+            year: { $year: "$timestamp" },
+            month: { $month: "$timestamp" },
+          },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { "_id.year": 1, "_id.month": 1 } },
+    ]);
+
+    const totalVisits = await Attendance.countDocuments({ userId: user._id });
+    const lastVisit = records.length > 0 ? records[0].timestamp : null;
+
+    return res.json({
+      records,
+      totalVisits,
+      lastVisit,
+      monthlyCounts,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ─────────────────────────────────────────────
 // GET /api/attendance/live
 // Admin: return users who checked in within the last 3 hours.
 // ─────────────────────────────────────────────

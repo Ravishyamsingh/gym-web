@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/Button";
@@ -15,14 +15,15 @@ export default function PaymentPage() {
   const plan = location.state?.plan;
 
   // If user already has active payment, redirect to next step
-  if (dbUser?.paymentStatus === "active") {
-    if (!dbUser.faceRegistered) {
-      navigate("/onboarding/face-registration", { replace: true });
-    } else {
-      navigate("/dashboard", { replace: true });
+  useEffect(() => {
+    if (dbUser?.paymentStatus === "active") {
+      if (!dbUser.faceRegistered) {
+        navigate("/onboarding/face-registration", { replace: true });
+      } else {
+        navigate("/dashboard", { replace: true });
+      }
     }
-    return null;
-  }
+  }, [dbUser?.paymentStatus, dbUser?.faceRegistered, navigate]);
 
   // If no plan was passed, redirect back to membership selection
   if (!plan) {

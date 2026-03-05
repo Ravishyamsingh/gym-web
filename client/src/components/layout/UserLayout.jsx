@@ -1,19 +1,14 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { Home, ScanFace, LogOut, CreditCard } from "lucide-react";
+import { Home, ScanFace, CreditCard } from "lucide-react";
+import AccountDropdown from "@/components/ui/AccountDropdown";
 
 /**
  * Mobile-optimised shell for the user-facing pages.
  * Bottom tab bar for one-thumb reach (as specified in the design doc).
  */
 export default function UserLayout({ children }) {
-  const { logout, dbUser } = useAuth();
-  const navigate = useNavigate();
-
-  const handleLogout = async () => {
-    await logout();
-    navigate("/");
-  };
+  const { dbUser } = useAuth();
 
   const hasActiveMembership = dbUser?.paymentStatus === "active";
 
@@ -24,12 +19,7 @@ export default function UserLayout({ children }) {
         <span className="font-display text-xl font-bold tracking-wider text-light">
           GYM<span className="text-blood">WEB</span>
         </span>
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-white/40 hidden sm:inline">{dbUser?.name}</span>
-          <button onClick={handleLogout} className="text-white/60 hover:text-blood transition-colors">
-            <LogOut size={18} />
-          </button>
-        </div>
+        <AccountDropdown />
       </header>
 
       {/* ── Content ��──────────────────────── */}

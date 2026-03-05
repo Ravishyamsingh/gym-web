@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/Button";
@@ -53,10 +53,11 @@ export default function MembershipPage() {
   const [error, setError] = useState("");
 
   // If user already has active payment, redirect to dashboard
-  if (dbUser?.paymentStatus === "active") {
-    navigate("/dashboard", { replace: true });
-    return null;
-  }
+  useEffect(() => {
+    if (dbUser?.paymentStatus === "active") {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [dbUser?.paymentStatus, navigate]);
 
   const handlePayNow = async (plan) => {
     setProcessingPlan(plan.id);

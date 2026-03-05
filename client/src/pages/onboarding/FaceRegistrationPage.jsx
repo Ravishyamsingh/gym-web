@@ -20,16 +20,14 @@ export default function FaceRegistrationPage() {
   const streamRef = useRef(null);
 
   // If payment not complete, redirect to membership page
-  if (dbUser && dbUser.paymentStatus !== "active") {
-    navigate("/onboarding/membership", { replace: true });
-    return null;
-  }
-
   // If face already registered, redirect to dashboard
-  if (dbUser && dbUser.faceRegistered) {
-    navigate("/dashboard", { replace: true });
-    return null;
-  }
+  useEffect(() => {
+    if (dbUser && dbUser.paymentStatus !== "active") {
+      navigate("/onboarding/membership", { replace: true });
+    } else if (dbUser && dbUser.faceRegistered) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [dbUser, navigate]);
 
   // ── Attach stream to video element once it's rendered ──
   useEffect(() => {
