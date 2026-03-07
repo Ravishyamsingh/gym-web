@@ -29,7 +29,3 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 ---
 
 See [PROJECT_OVERVIEW.md](./PROJECT_OVERVIEW.md) for the full architectural spec.
-
-
-cd d:\gymweb\server && npm start 
-cd d:\gymweb\client && npm run dev

@@ -403,6 +403,61 @@ export default function UserDashboard() {
           )}
 
           {/* ════════════════════════════════════════════════════
+              FACE VERIFICATION / REGISTRATION — Top of dashboard
+             ════════════════════════════════════════════════════ */}
+          {isActive && (
+            <motion.div variants={fadeUp} custom={0.6}>
+              {dbUser?.faceRegistered ? (
+                /* ── Face IS registered → Verify & Enter + Re-register ── */
+                <Card className="p-0 overflow-hidden border-emerald-500/20 bg-gradient-to-r from-emerald-500/10 via-emerald-500/5 to-surface">
+                  <div className="flex flex-col sm:flex-row items-center gap-4 p-5 sm:p-6">
+                    <div className="h-14 w-14 rounded-xl bg-emerald-500/20 flex items-center justify-center shrink-0 shadow-lg shadow-emerald-500/10">
+                      <ScanFace size={28} className="text-emerald-400" />
+                    </div>
+                    <div className="flex-1 min-w-0 text-center sm:text-left">
+                      <div className="flex items-center gap-2 justify-center sm:justify-start">
+                        <h3 className="text-lg font-bold text-white leading-tight">Face Registered</h3>
+                        <CheckCircle2 size={18} className="text-emerald-400" />
+                      </div>
+                      <p className="text-sm text-white/60 mt-1 leading-relaxed">Your face is on file. Verify to enter the gym.</p>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <Link to="/onboarding/face-registration">
+                        <Button variant="outline" size="sm" className="gap-1.5 text-xs border-white/15 hover:border-white/30">
+                          <RefreshCw size={14} /> Re-register
+                        </Button>
+                      </Link>
+                      <Link to="/verify">
+                        <Button size="lg" className="gap-2 bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-600/20">
+                          <ScanFace size={20} /> Face Verify & Enter
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                </Card>
+              ) : (
+                /* ── Face NOT registered → Register Face CTA ── */
+                <Card className="p-0 overflow-hidden border-yellow-500/20 bg-gradient-to-r from-yellow-500/10 via-yellow-500/5 to-surface">
+                  <div className="flex flex-col sm:flex-row items-center gap-4 p-5 sm:p-6">
+                    <div className="h-14 w-14 rounded-xl bg-yellow-500/20 flex items-center justify-center shrink-0 shadow-lg shadow-yellow-500/10">
+                      <ScanFace size={28} className="text-yellow-400" />
+                    </div>
+                    <div className="flex-1 min-w-0 text-center sm:text-left">
+                      <h3 className="text-lg font-bold text-white leading-tight">Face Registration Required</h3>
+                      <p className="text-sm text-white/60 mt-1 leading-relaxed">Register your face to enable gym entry verification.</p>
+                    </div>
+                    <Link to="/onboarding/face-registration" className="shrink-0">
+                      <Button size="lg" className="gap-2 bg-yellow-600 hover:bg-yellow-700 shadow-lg shadow-yellow-600/20">
+                        <ScanFace size={20} /> Register Your Face
+                      </Button>
+                    </Link>
+                  </div>
+                </Card>
+              )}
+            </motion.div>
+          )}
+
+          {/* ════════════════════════════════════════════════════
               ACTIVE MEMBERSHIP — ROW-BASED LAYOUT
              ════════════════════════════════════════════════════ */}
           {isActive ? (
@@ -526,27 +581,7 @@ export default function UserDashboard() {
                 </Card>
               </motion.div>
 
-              {/* ──────────────────────────────────────────────
-                  ROW 5 — VERIFY FACE CTA (full width)
-                 ────────────────────────────────────────────── */}
-              <motion.div variants={fadeUp} custom={4}>
-                <Link to="/verify" className="block">
-                  <motion.div whileHover={{ scale: 1.01, y: -2 }} whileTap={{ scale: 0.98 }}>
-                    <Card className="p-0 overflow-hidden border-blood/30 bg-gradient-to-r from-blood/15 via-blood/10 to-surface hover:border-blood/50 transition-all duration-300 cursor-pointer group">
-                      <div className="flex items-center gap-4 p-5 sm:p-6">
-                        <div className="h-14 w-14 rounded-xl bg-blood/20 flex items-center justify-center group-hover:bg-blood/30 transition-colors shrink-0 shadow-lg shadow-blood/10">
-                          <ScanFace size={28} className="text-blood" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-lg font-bold text-white leading-tight">Verify Face & Enter</h3>
-                          <p className="text-sm text-white/65 mt-1 leading-relaxed">Scan your face for gym access</p>
-                        </div>
-                        <ArrowRight size={22} className="text-white/50 group-hover:text-blood group-hover:translate-x-1 transition-all shrink-0" />
-                      </div>
-                    </Card>
-                  </motion.div>
-                </Link>
-              </motion.div>
+
 
               {/* ──────────────────────────────────────────────
                   ROW 6 — QUICK ACTIONS + TIMELINE (side by side)
@@ -560,8 +595,14 @@ export default function UserDashboard() {
                       {[
                         { to: "/onboarding/membership", icon: RefreshCw, label: "Renew Plan", color: "text-emerald-400" },
                         { to: "/complete-profile", icon: User, label: "Update Profile", color: "text-blue-400" },
-                        { to: "/verify", icon: ScanFace, label: "Face Verify", color: "text-blood" },
-                        { to: "/onboarding/face-registration", icon: Zap, label: "Re-register Face", color: "text-purple-400" },
+                        ...(dbUser?.faceRegistered
+                          ? [
+                              { to: "/verify", icon: ScanFace, label: "Face Verify", color: "text-blood" },
+                              { to: "/onboarding/face-registration", icon: Zap, label: "Re-register Face", color: "text-purple-400" },
+                            ]
+                          : [
+                              { to: "/onboarding/face-registration", icon: ScanFace, label: "Register Face", color: "text-yellow-400" },
+                            ]),
                       ].map((action) => (
                         <Link key={action.label} to={action.to}>
                           <Card className="p-4 border-white/8 hover:border-white/20 hover:-translate-y-0.5 transition-all duration-300 cursor-pointer text-center group h-full">

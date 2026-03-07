@@ -17,16 +17,15 @@ export default function FaceRegistrationPage() {
   const [cameraStarted, setCameraStarted] = useState(false);
   const [captureProgress, setCaptureProgress] = useState(null); // { current, total, score }
 
+  const isReRegistration = dbUser?.faceRegistered === true;
+
   const videoRef = useRef(null);
   const streamRef = useRef(null);
 
   // If payment not complete, redirect to membership page
-  // If face already registered, redirect to dashboard
   useEffect(() => {
     if (dbUser && dbUser.paymentStatus !== "active") {
       navigate("/onboarding/membership", { replace: true });
-    } else if (dbUser && dbUser.faceRegistered) {
-      navigate("/dashboard", { replace: true });
     }
   }, [dbUser, navigate]);
 
@@ -133,9 +132,13 @@ export default function FaceRegistrationPage() {
       >
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-light mb-2">Register Your Face</h1>
+          <h1 className="text-3xl font-bold text-light mb-2">
+            {isReRegistration ? "Re-register Your Face" : "Register Your Face"}
+          </h1>
           <p className="text-white/60">
-            This will be used for gym entry verification
+            {isReRegistration
+              ? "Update your face data for gym entry verification"
+              : "This will be used for gym entry verification"}
           </p>
         </div>
 
