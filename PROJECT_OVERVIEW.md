@@ -4,6 +4,7 @@
 
 GymWeb replaces traditional gym entry cards and manual attendance logs with **browser-based facial recognition**. Members verify their identity using their own phone camera, and the admin dashboard updates in real-time — zero hardware cost, zero API fees. The entire face-matching pipeline runs client-side via TensorFlow.js, keeping the system fast, private, and free to operate.
 
+
 ---
 
 ## Design System
