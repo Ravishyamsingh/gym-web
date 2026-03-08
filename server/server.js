@@ -4,7 +4,7 @@ const express = require("express");
 const cors = require("cors");
 const connectDB = require("./config/db");
 
-// ── Route imports ───────────────────────────
+// ── Route imports ──────────────────
 const authRoutes = require("./routes/auth");
 const userRoutes = require("./routes/users");
 const attendanceRoutes = require("./routes/attendance");
