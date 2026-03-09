@@ -28,6 +28,7 @@ app.use("/api/attendance", attendanceRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/reports", reportRoutes);
 
+
 // ── Global error handler ────────────────────
 app.use((err, _req, res, _next) => {
   console.error("Unhandled error:", err);
