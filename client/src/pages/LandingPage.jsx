@@ -49,7 +49,7 @@ const facilities = [
     icon: Shield,
     title: "Locker Rooms",
     desc: "Secure, clean, and well-maintained facilities with premium amenities.",
-    img: "https://images.unsplash.com/photo-1521290228999-bdd87ce1e531?w=600&q=80&auto=format&fit=crop",
+    img: "https://images.unsplash.com/photo-1766755418440-f3a342d54a58?w=600&q=80&auto=format&fit=crop",
   },
   {
     icon: Leaf,
