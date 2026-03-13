@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/Label";
 import { motion } from "framer-motion";
 import { Chrome } from "lucide-react";
 
+
+
 export default function LoginPage() {
   const { login, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
