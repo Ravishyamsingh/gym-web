@@ -10,8 +10,24 @@ const resolvedPath = path.isAbsolute(serviceAccountPath)
   ? serviceAccountPath
   : path.resolve(path.join(__dirname, ".."), serviceAccountPath);
 
-admin.initializeApp({
-  credential: admin.credential.cert(require(resolvedPath)),
-});
+// Support providing the service account JSON directly via an env var
+// (Railway and other hosts can store large JSON values as secrets).
+if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+  let sa;
+  try {
+    sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+  } catch (err) {
+    console.error('Invalid FIREBASE_SERVICE_ACCOUNT_JSON — must be valid JSON');
+    throw err;
+  }
+
+  admin.initializeApp({
+    credential: admin.credential.cert(sa),
+  });
+} else {
+  admin.initializeApp({
+    credential: admin.credential.cert(require(resolvedPath)),
+  });
+}
 
 module.exports = admin;
