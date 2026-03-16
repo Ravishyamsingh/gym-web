@@ -4,7 +4,7 @@ const express = require("express");
 const cors = require("cors");
 const connectDB = require("./config/db");
 
-// ── Route imports ───────────────────────────
+// ── Route imports ──────────────────
 const authRoutes = require("./routes/auth");
 const userRoutes = require("./routes/users");
 const attendanceRoutes = require("./routes/attendance");
@@ -66,6 +66,7 @@ app.use("/api/attendance", attendanceRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/webhooks", webhookRoutes);
 app.use("/api/reports", reportRoutes);
+
 
 // ── Global error handler ────────────────────
 app.use((err, _req, res, _next) => {

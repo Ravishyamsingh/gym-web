@@ -12,3 +12,4 @@ client/public/models/
 .DS_Store
 Thumbs.db
 server/config/serviceAccountKey.json
+

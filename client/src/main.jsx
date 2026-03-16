@@ -7,6 +7,7 @@ import { ToastProvider } from "./context/ToastContext";
 import { ToastContainer } from "./components/ui/ToastContainer";
 import "./styles/globals.css";
 
+
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <BrowserRouter>

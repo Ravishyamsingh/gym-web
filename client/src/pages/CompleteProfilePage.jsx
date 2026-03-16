@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/Button";
 import { motion } from "framer-motion";
 import { loadFaceModels, extractDescriptor } from "@/lib/faceApi";
 import api from "@/lib/api";
-import { ScanFace } from "lucide-react";
+import { ScanFace } from "lucide-react"; 
+
 
 export default function CompleteProfilePage() {
   const { dbUser, refreshProfile } = useAuth();
