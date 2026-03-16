@@ -1,4 +1,10 @@
 {
+  "scripts": {
+    "start": "node server/server.js"
+  },
+  "engines": {
+    "node": "18.x"
+  },
   "dependencies": {
     "nodemailer": "^8.0.2"
   }
