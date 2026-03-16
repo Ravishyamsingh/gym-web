@@ -1,0 +1,12 @@
+services:
+  - type: web_service
+    name: gym-web-server
+    env: node
+    plan: free
+    region: oregon
+    root: server
+    buildCommand: npm install --prefix server
+    startCommand: npm start --prefix server
+    envVars:
+      - key: NODE_ENV
+        value: production
