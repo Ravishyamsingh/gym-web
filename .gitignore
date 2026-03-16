@@ -7,7 +7,6 @@ package-lock.json
 *.bak
 .qodo/
 .vscode/
-client/public/models/
 *.log
 .DS_Store
 Thumbs.db
