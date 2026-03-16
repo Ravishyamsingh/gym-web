@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import UserLayout from "@/components/layout/UserLayout";
 import { Button } from "@/components/ui/Button";
@@ -14,12 +15,25 @@ import { ScanFace, CheckCircle2, XCircle } from "lucide-react";
 
 export default function VerifyFace() {
   const { dbUser, refreshProfile } = useAuth();
+  const [searchParams] = useSearchParams();
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const storedDescriptorRef = useRef(null); // Fresh copy from server
 
   const [status, setStatus] = useState("idle"); // idle | loading | scanning | verifying | granted | denied
   const [message, setMessage] = useState("");
+  const [showEmailFallback, setShowEmailFallback] = useState(false);
+  const [fallbackEmail, setFallbackEmail] = useState(dbUser?.email || "");
+  const [fallbackOtp, setFallbackOtp] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpLoading, setOtpLoading] = useState(false);
+
+  const action = searchParams.get("action") === "exit" ? "exit" : "entry";
+  const isExitAction = action === "exit";
+
+  useEffect(() => {
+    setFallbackEmail(dbUser?.email || "");
+  }, [dbUser?.email]);
 
   // Check if user has active membership
   const hasActiveMembership = dbUser?.paymentStatus === "active";
@@ -81,6 +95,13 @@ export default function VerifyFace() {
     streamRef.current?.getTracks().forEach((t) => t.stop());
   };
 
+  const resetFallback = () => {
+    setShowEmailFallback(false);
+    setOtpSent(false);
+    setFallbackOtp("");
+    setOtpLoading(false);
+  };
+
   useEffect(() => {
     return () => stopCamera();
   }, []);
@@ -124,23 +145,84 @@ export default function VerifyFace() {
       if (!match) {
         setStatus("denied");
         setMessage(`Face mismatch (distance: ${distance.toFixed(3)}). Access denied.`);
+        setShowEmailFallback(true);
         stopCamera();
         return;
       }
 
       // Face matched — call the backend to log attendance
-      setMessage("Face matched! Logging check-in…");
-      const { data } = await api.post("/attendance");
+      setMessage(isExitAction ? "Face matched! Logging exit…" : "Face matched! Logging check-in…");
+      const { data } = await api.post(isExitAction ? "/attendance/checkout" : "/attendance");
       await refreshProfile();
 
       stopCamera();
       setStatus("granted");
-      setMessage(`Access granted! Streak: ${data.currentStreak} days 🔥`);
+      if (isExitAction) {
+        setMessage(`Exit verified! Session closed (${data.durationMinutes || 0} min).`);
+      } else {
+        setMessage(`Access granted! Streak: ${data.currentStreak} days 🔥`);
+      }
     } catch (err) {
       stopCamera();
       const errMsg = err.response?.data?.error || err.message || "Verification failed";
       setStatus("denied");
       setMessage(errMsg);
+      setShowEmailFallback(true);
+    }
+  };
+
+  const requestOtpFallback = async () => {
+    const email = String(fallbackEmail || "").trim();
+    if (!email) {
+      setMessage("Please enter your registered email");
+      return;
+    }
+
+    try {
+      setOtpLoading(true);
+      setMessage("Sending OTP to your email…");
+      await api.post("/attendance/request-fallback-otp", {
+        email,
+        action,
+      });
+      setOtpSent(true);
+      setMessage("OTP sent. Check your inbox and enter the 6-digit code.");
+    } catch (err) {
+      setMessage(err.response?.data?.error || "Failed to send OTP");
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const verifyOtpFallback = async () => {
+    const email = String(fallbackEmail || "").trim();
+    const otp = String(fallbackOtp || "").trim();
+
+    if (!email || !otp) {
+      setMessage("Email and OTP are required");
+      return;
+    }
+
+    try {
+      setOtpLoading(true);
+      setMessage(isExitAction ? "Verifying OTP for exit…" : "Verifying OTP for entry…");
+      const endpoint = isExitAction ? "/attendance/verify-exit-otp" : "/attendance/verify-entry-otp";
+      const { data } = await api.post(endpoint, { email, otp });
+
+      await refreshProfile();
+      stopCamera();
+      setStatus("granted");
+      resetFallback();
+      setMessage(
+        isExitAction
+          ? `Exit verified via OTP! Session closed (${data.durationMinutes || 0} min).`
+          : `Entry verified via OTP! You can enter the gym now.`
+      );
+    } catch (err) {
+      setStatus("denied");
+      setMessage(err.response?.data?.error || "OTP verification failed");
+    } finally {
+      setOtpLoading(false);
     }
   };
 
@@ -152,11 +234,17 @@ export default function VerifyFace() {
         transition={{ duration: 0.4 }}
         className="mx-auto max-w-lg space-y-6 text-center"
       >
-        <h1 className="font-display text-3xl font-bold uppercase tracking-tight">Verify Entry</h1>
-        <p className="text-sm text-white/50">Your face is your membership card.</p>
+        <h1 className="font-display text-3xl font-bold uppercase tracking-tight">
+          {isExitAction ? "Verify Exit" : "Verify Entry"}
+        </h1>
+        <p className="text-sm text-white/50">
+          {isExitAction
+            ? "Face verification is required before exiting the gym."
+            : "Your face is your membership card."}
+        </p>
 
         {/* Membership check */}
-        {!hasActiveMembership && (
+        {!isExitAction && !hasActiveMembership && (
           <div className="rounded-xl border border-blood/30 bg-blood/10 px-6 py-4">
             <p className="text-sm text-blood font-semibold">
               You don't have an active membership. Please activate your membership first.
@@ -213,7 +301,12 @@ export default function VerifyFace() {
 
         {/* ── Action buttons ─────────────── */}
         {status === "idle" && (
-          <Button size="xl" className="w-full gap-3" onClick={startCamera} disabled={!hasActiveMembership || !isFaceRegistered}>
+            <Button
+              size="xl"
+              className="w-full gap-3"
+              onClick={startCamera}
+              disabled={(isExitAction ? !isFaceRegistered : (!hasActiveMembership || !isFaceRegistered))}
+            >
             <ScanFace size={24} />
             Open Camera
           </Button>
@@ -222,7 +315,7 @@ export default function VerifyFace() {
         {status === "scanning" && (
           <Button size="xl" className="w-full gap-3" onClick={handleVerify}>
             <ScanFace size={24} />
-            Verify Now
+              {isExitAction ? "Verify & Exit" : "Verify & Enter"}
           </Button>
         )}
 
@@ -235,10 +328,64 @@ export default function VerifyFace() {
               storedDescriptorRef.current = null;
               setStatus("idle");
               setMessage("");
+              resetFallback();
             }}
           >
             Try Again
           </Button>
+        )}
+
+        {status === "denied" && !showEmailFallback && (
+          <Button
+            variant="outline"
+            size="lg"
+            className="w-full border-yellow-500/35 text-yellow-300 hover:bg-yellow-500/10"
+            onClick={() => setShowEmailFallback(true)}
+          >
+            Use Email Fallback
+          </Button>
+        )}
+
+        {status === "denied" && showEmailFallback && (
+          <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-4 space-y-3 text-left">
+            <p className="text-sm font-semibold text-yellow-300">Email OTP Fallback</p>
+            <input
+              type="email"
+              value={fallbackEmail}
+              onChange={(e) => setFallbackEmail(e.target.value)}
+              placeholder="Enter your registered email"
+              className="w-full rounded-lg border border-white/15 bg-void/60 px-3 py-2 text-sm text-light placeholder-white/40 focus:outline-none focus:border-yellow-500/40"
+            />
+
+            {!otpSent && (
+              <Button
+                className="w-full"
+                onClick={requestOtpFallback}
+                disabled={otpLoading}
+              >
+                {otpLoading ? "Sending OTP…" : "Send OTP"}
+              </Button>
+            )}
+
+            {otpSent && (
+              <>
+                <input
+                  type="text"
+                  value={fallbackOtp}
+                  onChange={(e) => setFallbackOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  placeholder="Enter 6-digit OTP"
+                  className="w-full rounded-lg border border-white/15 bg-void/60 px-3 py-2 text-sm text-light placeholder-white/40 focus:outline-none focus:border-yellow-500/40"
+                />
+                <Button
+                  className="w-full bg-emerald-600 hover:bg-emerald-700"
+                  onClick={verifyOtpFallback}
+                  disabled={otpLoading}
+                >
+                  {otpLoading ? "Verifying OTP…" : isExitAction ? "Verify OTP & Exit" : "Verify OTP & Enter"}
+                </Button>
+              </>
+            )}
+          </div>
         )}
 
         {status !== "idle" && <p className="text-xs text-white/40">{message}</p>}

@@ -1,11 +1,12 @@
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { LayoutDashboard, Users, CreditCard, Settings, LogOut } from "lucide-react";
+import { LayoutDashboard, Users, CreditCard, Clock, Settings, LogOut } from "lucide-react";
 
 const navItems = [
   { to: "/admin", icon: LayoutDashboard, label: "Overview", end: true },
   { to: "/admin/members", icon: Users, label: "Members" },
   { to: "/admin/payments", icon: CreditCard, label: "Payments" },
+  { to: "/admin/attendance", icon: Clock, label: "Attendance" },
   { to: "/admin/settings", icon: Settings, label: "Settings" },
 ];
 

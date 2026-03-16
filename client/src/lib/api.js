@@ -1,18 +1,84 @@
 import axios from "axios";
 import { auth } from "./firebase";
 
+const apiOrigin = import.meta.env.VITE_API_URL?.trim();
+const normalizedApiOrigin = apiOrigin
+  ? apiOrigin.replace(/\/+$/, "").replace(/\/api$/i, "")
+  : "";
+const baseURL = normalizedApiOrigin
+  ? `${normalizedApiOrigin}/api`
+  : "/api"; // Dev uses Vite proxy.
+
 const api = axios.create({
-  baseURL: "/api", // proxied to Express by Vite in dev
+  baseURL,
 });
 
-// Attach the Firebase ID-token to every outgoing request
-api.interceptors.request.use(async (config) => {
-  const user = auth.currentUser;
-  if (user) {
-    const token = await user.getIdToken();
-    config.headers.Authorization = `Bearer ${token}`;
+const PUBLIC_AUTH_ROUTES = [
+  "/auth/login",
+  "/auth/register",
+  "/auth/check-user",
+];
+
+function isPublicAuthRoute(url = "") {
+  return PUBLIC_AUTH_ROUTES.some((route) => url.startsWith(route));
+}
+
+// Attach the Firebase ID-token OR JWT token to every outgoing request
+api.interceptors.request.use(
+  async (config) => {
+    const requestUrl = String(config?.url || "");
+
+    // Public auth routes should never require auth headers.
+    if (isPublicAuthRoute(requestUrl)) {
+      return config;
+    }
+
+    // Respect explicit Authorization headers provided by the caller.
+    if (config?.headers?.Authorization) {
+      return config;
+    }
+
+    config.headers = config.headers || {};
+
+    // Prefer Firebase token when a Firebase session exists.
+    // This avoids stale JWTs overriding OAuth/admin sessions.
+    const user = auth.currentUser;
+    if (user) {
+      try {
+        const token = await user.getIdToken(true); // Force refresh for fresh token
+        config.headers.Authorization = `Bearer ${token}`;
+        return config;
+      } catch (err) {
+        // Do not block requests if Firebase token refresh fails.
+        // Fallback to JWT below if available.
+        console.warn("Failed to refresh Firebase ID token; falling back to JWT when available:", err?.code || err?.message || err);
+      }
+    }
+
+    // Fallback to JWT token (password-based auth)
+    const jwtToken = localStorage.getItem("jwtToken");
+    if (jwtToken) {
+      config.headers.Authorization = `Bearer ${jwtToken}`;
+    }
+    return config;
+  },
+  (err) => Promise.reject(err)
+);
+
+// Log API response errors for debugging
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 500) {
+      console.error("Server error 500 - API call failed:", {
+        url: error.config?.url,
+        method: error.config?.method,
+        data: error.response?.data,
+        message: error.response?.data?.error,
+      });
+    }
+    return Promise.reject(error);
   }
-  return config;
-});
+);
 
 export default api;

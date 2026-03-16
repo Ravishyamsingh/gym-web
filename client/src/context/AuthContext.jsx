@@ -50,14 +50,81 @@ export function AuthProvider({ children }) {
     return unsub;
   }, []);
 
-  // ── Auth helpers ──────────────────────────
+  // ──────────────────────────────────────────────────────────────────
+  // PASSWORD-BASED AUTHENTICATION
+  // ──────────────────────────────────────────────────────────────────
+
+  /**
+   * Login with email/userId and password (password-based auth)
+   */
+  const loginWithPassword = async (credentials, password) => {
+    try {
+      // For password-based auth, we make direct API call
+      const response = await api.post("/auth/login", {
+        ...credentials,
+        password,
+      });
+
+      const user = response.data.user;
+      const jwtToken = response.data.jwtToken;
+
+      // Store JWT token for subsequent API calls
+      if (jwtToken) {
+        localStorage.setItem("jwtToken", jwtToken);
+      }
+
+      setDbUser(user);
+      setProfileComplete(checkOnboardingComplete(user));
+
+      return user;
+    } catch (err) {
+      console.error("Password login error:", err);
+      throw err;
+    }
+  };
+
+  /**
+   * Signup with email, userId, password, and name
+   */
+  const signupWithPassword = async (email, userId, password, name) => {
+    try {
+      const response = await api.post("/auth/register", {
+        email,
+        userId,
+        password,
+        name,
+      });
+
+      const user = response.data.user;
+      const jwtToken = response.data.jwtToken;
+
+      // Store JWT token for subsequent API calls
+      if (jwtToken) {
+        localStorage.setItem("jwtToken", jwtToken);
+      }
+
+      setDbUser(user);
+
+      return user;
+    } catch (err) {
+      console.error("Password signup error:", err);
+      throw err;
+    }
+  };
+
+  // ──────────────────────────────────────────────────────────────────
+  // FIREBASE & GOOGLE AUTHENTICATION (LEGACY)
+  // ──────────────────────────────────────────────────────────────────
+
+  /**
+   * Legacy: Signup with Firebase email/password + name
+   */
   const signup = async (email, password, name, faceDescriptor = []) => {
+    localStorage.removeItem("jwtToken");
     let cred;
     try {
       cred = await createUserWithEmailAndPassword(auth, email, password);
     } catch (fbErr) {
-      // If Firebase user already exists (e.g., previous failed registration),
-      // try signing in instead and then register in MongoDB
       if (fbErr.code === "auth/email-already-in-use") {
         cred = await signInWithEmailAndPassword(auth, email, password);
       } else {
@@ -66,10 +133,12 @@ export function AuthProvider({ children }) {
     }
     await updateProfile(cred.user, { displayName: name });
 
-    // Create the MongoDB user document (may already exist — handle 409)
+    // Ensure token is fresh
+    const idToken = await cred.user.getIdToken(true);
+    console.log("[AUTH] Firebase signup successful");
+
     try {
-      const { data } = await api.post("/auth/register", {
-        firebaseId: cred.user.uid,
+      const { data } = await api.post("/auth/firebase/register", {
         name,
         email,
         faceDescriptor,
@@ -77,11 +146,8 @@ export function AuthProvider({ children }) {
       setDbUser(data.user);
       return data.user;
     } catch (regErr) {
-      // If user already exists in Mongo, just login instead
       if (regErr.response?.status === 409) {
-        const { data } = await api.post("/auth/login", {
-          firebaseId: cred.user.uid,
-        });
+        const { data } = await api.post("/auth/firebase/login", {});
         setDbUser(data.user);
         setProfileComplete(checkOnboardingComplete(data.user));
         return data.user;
@@ -90,27 +156,47 @@ export function AuthProvider({ children }) {
     }
   };
 
+  /**
+   * Legacy: Login with Firebase email/password
+   */
   const login = async (email, password) => {
-    const cred = await signInWithEmailAndPassword(auth, email, password);
+    try {
+      localStorage.removeItem("jwtToken");
+      const cred = await signInWithEmailAndPassword(auth, email, password);
 
-    const { data } = await api.post("/auth/login", {
-      firebaseId: cred.user.uid,
-    });
-    setDbUser(data.user);
-    setProfileComplete(checkOnboardingComplete(data.user));
-    return data.user;
+      // Ensure token is fresh
+      const idToken = await cred.user.getIdToken(true);
+      console.log("[AUTH] Firebase login successful");
+
+      const { data } = await api.post("/auth/firebase/login", {});
+
+      setDbUser(data.user);
+      setProfileComplete(checkOnboardingComplete(data.user));
+      return data.user;
+    } catch (err) {
+      console.error("[AUTH] Firebase login error:", err);
+      throw err;
+    }
   };
 
+  /**
+   * Google OAuth login
+   */
   const loginWithGoogle = async () => {
+    localStorage.removeItem("jwtToken");
     const provider = new GoogleAuthProvider();
     const cred = await signInWithPopup(auth, provider);
 
-    // Use the dedicated Google auth endpoint that handles both login and registration
+    // Ensure token is fresh
+    const idToken = await cred.user.getIdToken(true);
+    console.log("[AUTH] Google sign-in successful");
+
     const { data } = await api.post("/auth/google", {
       name: cred.user.displayName || cred.user.email.split("@")[0],
       email: cred.user.email,
     });
 
+    localStorage.removeItem("jwtToken");
     setDbUser(data.user);
     setProfileComplete(checkOnboardingComplete(data.user));
     return data.user;
@@ -118,10 +204,11 @@ export function AuthProvider({ children }) {
 
   const logout = async () => {
     await signOut(auth);
+    localStorage.removeItem("jwtToken");
     setDbUser(null);
   };
 
-  /** Refresh the MongoDB profile (call after face-descriptor update, etc.) */
+  /** Refresh the MongoDB profile */
   const refreshProfile = async () => {
     try {
       const { data } = await api.get("/users/me");
@@ -132,13 +219,13 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Helper to determine where to redirect after auth
-  // After login, users always go to dashboard first
+  /**
+   * Determine redirect after auth
+   */
   const getOnboardingRedirect = (user) => {
     const u = user || dbUser;
     if (!u) return "/login";
     if (u.role === "admin") return "/admin";
-    // All authenticated users go to dashboard first
     return "/dashboard";
   };
 
@@ -147,6 +234,10 @@ export function AuthProvider({ children }) {
     dbUser,
     loading,
     profileComplete,
+    // Password-based auth
+    loginWithPassword,
+    signupWithPassword,
+    // Legacy Firebase auth
     signup,
     login,
     loginWithGoogle,
@@ -154,7 +245,7 @@ export function AuthProvider({ children }) {
     refreshProfile,
     getOnboardingRedirect,
     isAdmin: dbUser?.role === "admin",
-    isAuthenticated: !!firebaseUser && !!dbUser,
+    isAuthenticated: !!dbUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

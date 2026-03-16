@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/Button";
 import HeroSection from "@/components/sections/HeroSection";
 import {
@@ -11,7 +11,6 @@ import {
   Clock,
   Leaf,
   Shield,
-  Star,
   ArrowRight,
   MapPin,
   Phone,
@@ -68,10 +67,28 @@ const benefits = [
   { icon: Users, title: "Community", desc: "Join a supportive community of fitness enthusiasts." },
 ];
 
+const MONTHLY_FEE = 600;
+const formatInr = (amount) => `₹${amount.toLocaleString("en-IN")}`;
+
 const plans = [
-  { duration: "1 Month", price: "₹500", per: "/month", features: ["Unlimited Gym Access", "All Equipment", "Basic Support"] },
-  { duration: "6 Months", price: "₹2,500", per: "/6 months", features: ["Unlimited Gym Access", "All Equipment", "Priority Support", "Monthly Fitness Report"], popular: true },
-  { duration: "1 Year", price: "₹5,000", per: "/year", features: ["Unlimited Gym Access", "All Equipment", "Priority Support", "Monthly Fitness Report", "Free Personal Training", "Nutrition Consultation"] },
+  { duration: "1 Month", months: 1, per: "/month", features: ["Unlimited Gym Access", "All Equipment", "Basic Support"] },
+  {
+    duration: "6 Months",
+    months: 6,
+    per: "/6 months",
+    specialOfferPrice: 3000,
+    isSpecialOffer: true,
+    popular: true,
+    features: ["Unlimited Gym Access", "All Equipment", "Priority Support", "Monthly Fitness Report"],
+  },
+  {
+    duration: "12 Months",
+    months: 12,
+    per: "/12 months",
+    specialOfferPrice: 5400,
+    isSpecialOffer: true,
+    features: ["Unlimited Gym Access", "All Equipment", "Priority Support", "Monthly Fitness Report", "Free Personal Training", "Nutrition Consultation"],
+  },
 ];
 
 const galleryImages = [
@@ -85,34 +102,24 @@ const galleryImages = [
   { src: "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=600&q=80&auto=format&fit=crop", alt: "Group Training" },
 ];
 
-const testimonials = [
+const programs = [
   {
-    name: "Rajesh Kumar",
-    role: "Member since 2024",
-    feedback: "Transformed my fitness journey in just 6 months. The trainers are amazing and the equipment is world-class!",
-    rating: 5,
-    avatar: "https://images.unsplash.com/photo-1568602471122-7832951cc4c5?w=200&q=80&auto=format&fit=crop&crop=face",
+    title: "Strength Builder",
+    duration: "12 Weeks",
+    desc: "Progressive overload focused program for pure strength gains and better lifting form.",
+    icon: Dumbbell,
   },
   {
-    name: "Priya Singh",
-    role: "Member since 2023",
-    feedback: "Best gym experience ever. Clean facilities, supportive community, and flexible timings that fit my schedule.",
-    rating: 5,
-    avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&q=80&auto=format&fit=crop&crop=face",
+    title: "Fat Loss Express",
+    duration: "8 Weeks",
+    desc: "HIIT + cardio + nutrition support to reduce fat percentage without losing muscle quality.",
+    icon: Zap,
   },
   {
-    name: "Amit Patel",
-    role: "Member since 2024",
-    feedback: "Professional trainers and modern equipment. Lost 15 kg in 4 months. Highly recommended for everyone!",
-    rating: 5,
-    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&q=80&auto=format&fit=crop&crop=face",
-  },
-  {
-    name: "Sneha Rao",
-    role: "Member since 2025",
-    feedback: "The personalized nutrition plan combined with training has given me results I never thought possible.",
-    rating: 5,
-    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&q=80&auto=format&fit=crop&crop=face",
+    title: "Body Recomposition",
+    duration: "16 Weeks",
+    desc: "Balanced program to build lean muscle while reducing fat with trainer-led tracking.",
+    icon: Heart,
   },
 ];
 
@@ -127,16 +134,6 @@ const fadeUp = {
   }),
 };
 
-const fadeLeft = {
-  hidden: { opacity: 0, x: -60 },
-  visible: { opacity: 1, x: 0, transition: { duration: 0.7, ease: "easeOut" } },
-};
-
-const fadeRight = {
-  hidden: { opacity: 0, x: 60 },
-  visible: { opacity: 1, x: 0, transition: { duration: 0.7, ease: "easeOut" } },
-};
-
 const scaleIn = {
   hidden: { opacity: 0, scale: 0.85 },
   visible: (i = 0) => ({
@@ -146,12 +143,76 @@ const scaleIn = {
   }),
 };
 
+const zoomReveal = {
+  hidden: (i = 0) => ({
+    opacity: 0,
+    scale: 0.78,
+    rotate: i % 2 === 0 ? -2 : 2,
+    x: i % 2 === 0 ? -24 : 24,
+  }),
+  visible: (i = 0) => ({
+    opacity: 1,
+    scale: 1,
+    rotate: 0,
+    x: 0,
+    transition: { duration: 0.72, delay: i * 0.08, ease: [0.16, 1, 0.3, 1] },
+  }),
+};
+
+const flipIn = {
+  hidden: { opacity: 0, rotateY: -18, y: 42 },
+  visible: (i = 0) => ({
+    opacity: 1,
+    rotateY: 0,
+    y: 0,
+    transition: { duration: 0.78, delay: i * 0.1, ease: [0.16, 1, 0.3, 1] },
+  }),
+};
+
+const slideInRight = {
+  hidden: { opacity: 0, x: 90 },
+  visible: (i = 0) => ({
+    opacity: 1,
+    x: 0,
+    transition: { duration: 0.65, delay: i * 0.12, ease: [0.22, 1, 0.36, 1] },
+  }),
+};
+
+const staggerContainer = {
+  hidden: {},
+  visible: {
+    transition: {
+      staggerChildren: 0.16,
+      delayChildren: 0.05,
+    },
+  },
+};
+
+const splitImage = {
+  hidden: { opacity: 0, x: -90, scale: 0.92 },
+  visible: {
+    opacity: 1,
+    x: 0,
+    scale: 1,
+    transition: { duration: 0.85, ease: [0.16, 1, 0.3, 1] },
+  },
+};
+
+const splitText = {
+  hidden: { opacity: 0, x: 90 },
+  visible: {
+    opacity: 1,
+    x: 0,
+    transition: { duration: 0.85, ease: [0.16, 1, 0.3, 1], staggerChildren: 0.12 },
+  },
+};
+
 function SectionHeading({ sub, children }) {
   return (
     <motion.div
       initial="hidden"
       whileInView="visible"
-      viewport={{ once: true, margin: "-80px" }}
+      viewport={{ once: true, amount: 0.35 }}
       variants={fadeUp}
       className="text-center mb-14"
     >
@@ -163,7 +224,15 @@ function SectionHeading({ sub, children }) {
       <h2 className="font-display text-4xl sm:text-5xl font-bold uppercase mb-4">
         {children}
       </h2>
-      <div className="h-1 w-20 bg-blood mx-auto rounded-full" />
+      <div className="relative h-1 w-28 bg-white/10 mx-auto overflow-hidden rounded-full">
+        <motion.span
+          className="absolute inset-y-0 left-0 w-16 bg-blood rounded-full"
+          initial={{ x: -70 }}
+          whileInView={{ x: 120 }}
+          viewport={{ once: true, margin: "-80px" }}
+          transition={{ duration: 1, ease: "easeInOut", delay: 0.15 }}
+        />
+      </div>
     </motion.div>
   );
 }
@@ -171,19 +240,27 @@ function SectionHeading({ sub, children }) {
 /* ─── Component ───────────────────────────────────────────────────── */
 
 export default function LandingPage() {
+  const shouldReduceMotion = useReducedMotion();
+  const revealViewport = shouldReduceMotion
+    ? { once: true, amount: 0.5 }
+    : { once: false, margin: "-120px 0px -120px 0px", amount: 0.2 };
+  const endRevealViewport = shouldReduceMotion
+    ? { once: true, amount: 0.5 }
+    : { once: true, amount: 0.28, margin: "-70px 0px -70px 0px" };
+
   return (
     <div className="bg-void text-light overflow-x-hidden">
       {/* ── Navbar ──────────────────────────── */}
       <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-4 bg-void/80 backdrop-blur-lg border-b border-white/5">
-        <Link to="/" className="font-display text-2xl font-bold tracking-wider">
-          GYM<span className="text-blood">WEB</span>
+        <Link to="/" className="font-display text-2xl font-bold tracking-wider uppercase">
+          Om Muruga <span className="text-blood">Olympia Fitness</span>
         </Link>
         <div className="hidden md:flex items-center gap-6 text-sm text-white/60">
-          <a href="#about" className="hover:text-blood transition">About</a>
-          <a href="#facilities" className="hover:text-blood transition">Facilities</a>
-          <a href="#gallery" className="hover:text-blood transition">Gallery</a>
-          <a href="#plans" className="hover:text-blood transition">Plans</a>
-          <a href="#testimonials" className="hover:text-blood transition">Reviews</a>
+          <a href="#about" className="nav-link">About</a>
+          <a href="#facilities" className="nav-link">Facilities</a>
+          <a href="#gallery" className="nav-link">Gallery</a>
+          <a href="#plans" className="nav-link">Plans</a>
+          <a href="#programs" className="nav-link">Programs</a>
         </div>
         <div className="flex items-center gap-3">
           <Link to="/login">
@@ -215,25 +292,35 @@ export default function LandingPage() {
             <motion.div
               initial="hidden"
               whileInView="visible"
-              viewport={{ once: true, margin: "-80px" }}
-              variants={fadeLeft}
+              viewport={revealViewport}
+              variants={splitImage}
               className="relative"
             >
               {/* Main image */}
-              <div className="relative rounded-2xl overflow-hidden group shadow-2xl shadow-black/50">
-                <img
+              <motion.div
+                className="relative rounded-2xl overflow-hidden group shadow-2xl shadow-black/50"
+                initial={{ scale: 1.05 }}
+                whileInView={{ scale: 1 }}
+                viewport={revealViewport}
+                transition={{ duration: 0.7, ease: "easeOut" }}
+              >
+                <motion.img
                   src="https://images.unsplash.com/photo-1571902943202-507ec2618e8f?w=800&q=80&auto=format&fit=crop"
                   alt="Gym interior"
                   className="w-full h-[440px] object-cover transition-transform duration-700 group-hover:scale-105"
                   loading="lazy"
+                  initial={{ scale: 1.15 }}
+                  whileInView={{ scale: 1 }}
+                  viewport={revealViewport}
+                  transition={{ duration: 1.1, ease: "easeOut" }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
-              </div>
+              </motion.div>
               {/* Small secondary image offset */}
               <motion.div
                 initial={{ opacity: 0, x: 30 }}
                 whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
+                viewport={revealViewport}
                 transition={{ delay: 0.4, duration: 0.6 }}
                 className="hidden lg:block absolute -bottom-8 -right-8 w-48 h-48 rounded-xl overflow-hidden border-4 border-void shadow-xl"
               >
@@ -248,7 +335,7 @@ export default function LandingPage() {
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
+                viewport={revealViewport}
                 transition={{ delay: 0.6, duration: 0.5 }}
                 className="absolute -bottom-6 left-6 bg-blood rounded-xl p-5 shadow-2xl shadow-blood/30"
               >
@@ -261,51 +348,58 @@ export default function LandingPage() {
             <motion.div
               initial="hidden"
               whileInView="visible"
-              viewport={{ once: true, margin: "-80px" }}
-              variants={fadeRight}
+              viewport={revealViewport}
+              variants={splitText}
               className="space-y-6"
             >
-              <div>
+              <motion.div variants={fadeUp}>
                 <h3 className="text-2xl font-bold text-blood mb-3">Our Mission</h3>
                 <p className="text-white/70 leading-relaxed">
                   To empower individuals to achieve their fitness goals through expert guidance,
                   modern facilities, and a welcoming community environment that inspires greatness.
                 </p>
-              </div>
-              <div>
+              </motion.div>
+              <motion.div variants={fadeUp}>
                 <h3 className="text-2xl font-bold text-blood mb-3">Our Vision</h3>
                 <p className="text-white/70 leading-relaxed">
                   To be the most trusted fitness destination, known for transforming lives
                   and building a healthier, stronger community — one member at a time.
                 </p>
-              </div>
-              <div>
+              </motion.div>
+              <motion.div variants={fadeUp}>
                 <h3 className="text-2xl font-bold text-blood mb-3">Why Choose Us</h3>
                 <p className="text-white/70 leading-relaxed">
                   With over a decade of excellence we combine cutting-edge equipment,
                   certified trainers, and personalized programs to ensure real, lasting results.
                 </p>
-              </div>
+              </motion.div>
 
               {/* Quick stats row */}
-              <div className="grid grid-cols-3 gap-4 pt-4">
+              <motion.div variants={staggerContainer} className="grid grid-cols-3 gap-4 pt-4">
                 {[
-                  { val: "500+", label: "Members" },
-                  { val: "15+", label: "Trainers" },
+                  { val: "100+", label: "Members" },
+                  { val: "1+", label: "Trainers" },
                   { val: "24/7", label: "Access" },
                 ].map((s) => (
-                  <div key={s.label} className="text-center rounded-xl bg-white/5 border border-white/10 py-3">
+                  <motion.div
+                    key={s.label}
+                    variants={fadeUp}
+                    whileHover={{ y: -4, scale: 1.03 }}
+                    className="text-center rounded-xl bg-white/5 border border-white/10 py-3"
+                  >
                     <p className="text-xl font-bold text-blood font-display">{s.val}</p>
                     <p className="text-xs text-white/50 mt-0.5">{s.label}</p>
-                  </div>
+                  </motion.div>
                 ))}
-              </div>
+              </motion.div>
 
-              <Link to="/register">
-                <Button size="lg" className="gap-2 mt-4">
-                  Join Us Today <ArrowRight size={18} />
-                </Button>
-              </Link>
+              <motion.div variants={fadeUp}>
+                <Link to="/register">
+                  <Button size="lg" className="gap-2 mt-4 liquid-btn">
+                    Join Us Today <ArrowRight size={18} />
+                  </Button>
+                </Link>
+              </motion.div>
             </motion.div>
           </div>
         </div>
@@ -325,39 +419,48 @@ export default function LandingPage() {
             Our <span className="text-blood">Facilities</span>
           </SectionHeading>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={revealViewport}
+            variants={staggerContainer}
+            className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6"
+          >
             {facilities.map((f, i) => (
               <motion.div
                 key={f.title}
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true, margin: "-60px" }}
-                variants={fadeUp}
+                variants={flipIn}
                 custom={i}
-                whileHover={{ y: -8, transition: { duration: 0.3 } }}
-                className="group flex flex-col rounded-2xl border border-white/10 bg-surface/60 overflow-hidden hover:border-blood/50 hover:shadow-xl hover:shadow-blood/10 transition-all duration-300"
+                whileHover={{ y: -12, scale: 1.02, transition: { duration: 0.3 } }}
+                className="group flex flex-col rounded-2xl border border-white/10 bg-surface/60 overflow-hidden hover:border-blood/60 hover:shadow-2xl hover:shadow-blood/25 transition-all duration-300"
+                style={{ transformStyle: "preserve-3d" }}
               >
                 {/* Image */}
-                <div className="relative h-48 overflow-hidden">
-                  <img
+                <motion.div className="relative h-48 overflow-hidden" variants={zoomReveal} custom={i}>
+                  <motion.img
                     src={f.img}
                     alt={f.title}
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                     loading="lazy"
+                    whileHover={{ scale: 1.12 }}
+                    transition={{ duration: 0.35 }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-surface via-surface/20 to-transparent" />
-                  <div className="absolute bottom-3 left-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-blood shadow-lg shadow-blood/40">
+                  <motion.div
+                    whileHover={{ rotate: -8, scale: 1.08 }}
+                    className="absolute bottom-3 left-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-blood shadow-lg shadow-blood/40"
+                  >
                     <f.icon size={24} className="text-white" />
-                  </div>
-                </div>
+                  </motion.div>
+                </motion.div>
                 {/* Text */}
-                <div className="flex-1 p-5">
+                <motion.div variants={fadeUp} className="flex-1 p-5">
                   <h3 className="text-lg font-bold text-light mb-2">{f.title}</h3>
                   <p className="text-white/55 text-sm leading-relaxed">{f.desc}</p>
-                </div>
+                </motion.div>
               </motion.div>
             ))}
-          </div>
+          </motion.div>
         </div>
       </section>
 
@@ -388,10 +491,10 @@ export default function LandingPage() {
                 key={b.title}
                 initial="hidden"
                 whileInView="visible"
-                viewport={{ once: true, margin: "-60px" }}
+                viewport={revealViewport}
                 variants={scaleIn}
                 custom={i}
-                whileHover={{ scale: 1.04, transition: { duration: 0.25 } }}
+                whileHover={{ scale: 1.045, y: -6, transition: { duration: 0.25 } }}
                 className="flex flex-col rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-7 hover:border-blood/50 hover:bg-blood/5 hover:shadow-xl hover:shadow-blood/10 transition-all duration-300"
               >
                 <div className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-xl bg-blood/20 group-hover:bg-blood/30 transition-colors">
@@ -423,8 +526,8 @@ export default function LandingPage() {
                 key={i}
                 initial="hidden"
                 whileInView="visible"
-                viewport={{ once: true, margin: "-40px" }}
-                variants={scaleIn}
+                viewport={revealViewport}
+                variants={zoomReveal}
                 custom={i}
                 className={`relative rounded-xl overflow-hidden group cursor-pointer border border-white/5 hover:border-blood/30 transition-all duration-300 hover:shadow-lg hover:shadow-blood/10 ${img.span || ""}`}
               >
@@ -465,30 +568,58 @@ export default function LandingPage() {
             Membership <span className="text-blood">Plans</span>
           </SectionHeading>
 
-          <div className="grid md:grid-cols-3 gap-6 items-stretch">
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={revealViewport}
+            variants={staggerContainer}
+            className="grid md:grid-cols-3 gap-6 items-stretch"
+          >
             {plans.map((plan, i) => (
               <motion.div
                 key={plan.duration}
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true, margin: "-60px" }}
                 variants={fadeUp}
-                custom={i}
-                whileHover={{ y: -10, transition: { duration: 0.3 } }}
+                whileHover={{ y: -12, scale: 1.02, transition: { duration: 0.3 } }}
                 className={`flex flex-col rounded-2xl border-2 p-8 backdrop-blur-md transition-all duration-300 ${
                   plan.popular
                     ? "border-blood bg-gradient-to-br from-blood/25 to-surface/90 md:scale-105 shadow-2xl shadow-blood/20"
-                    : "border-white/10 bg-surface/80 hover:border-blood/40 hover:shadow-lg hover:shadow-blood/10"
+                    : "border-white/10 bg-surface/80 hover:border-blood/40 hover:shadow-2xl hover:shadow-blood/20"
                 }`}
               >
-                {plan.popular && (
-                  <div className="mb-4 inline-block bg-blood text-white text-xs font-bold px-3 py-1 rounded-full">
-                    MOST POPULAR
-                  </div>
-                )}
+                <div className="mb-4 flex flex-wrap gap-2">
+                  {plan.popular && (
+                    <div className="inline-block bg-blood text-white text-xs font-bold px-3 py-1 rounded-full">
+                      MOST POPULAR
+                    </div>
+                  )}
+                  {plan.isSpecialOffer && (
+                    <motion.div
+                      className="relative inline-flex items-center rounded-md bg-gradient-to-r from-blood to-red-500 px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-wider text-white shadow-lg shadow-blood/40 ring-1 ring-white/20"
+                      initial={{ scale: 0.92, rotate: -7 }}
+                      whileInView={{ scale: 1, rotate: -5 }}
+                      animate={{ y: [0, -2, 0], rotate: [-5, -4, -5] }}
+                      transition={{
+                        whileInView: { duration: 0.35, ease: "easeOut" },
+                        y: { duration: 1.8, repeat: Infinity, ease: "easeInOut" },
+                        rotate: { duration: 2.2, repeat: Infinity, ease: "easeInOut" },
+                      }}
+                    >
+                      <span className="absolute -left-1 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-black/35" />
+                      <span className="absolute -right-1 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-black/35" />
+                      Special Offer
+                    </motion.div>
+                  )}
+                </div>
                 <h3 className="text-2xl font-bold text-white mb-2">{plan.duration}</h3>
                 <div className="mb-6">
-                  <span className="text-4xl font-bold text-blood">{plan.price}</span>
+                  {plan.isSpecialOffer && (
+                    <p className="text-xs sm:text-sm text-white/45 line-through mb-1">
+                      {formatInr(plan.months * MONTHLY_FEE)}
+                    </p>
+                  )}
+                  <span className="text-4xl font-bold text-blood">
+                    {formatInr(plan.isSpecialOffer ? plan.specialOfferPrice : plan.months * MONTHLY_FEE)}
+                  </span>
                   <span className="text-white/60 text-sm">{plan.per}</span>
                 </div>
                 <ul className="space-y-3 mb-8 flex-1">
@@ -500,66 +631,85 @@ export default function LandingPage() {
                   ))}
                 </ul>
                 <Link to="/register" className="block mt-auto">
-                  <Button className="w-full" variant={plan.popular ? "default" : "outline"}>
+                  <Button className="w-full liquid-btn" variant={plan.popular ? "default" : "outline"}>
                     Get Started
                   </Button>
                 </Link>
               </motion.div>
             ))}
-          </div>
+          </motion.div>
         </div>
       </section>
 
       {/* ══════════════════════════════════════
-           TESTIMONIALS
+           TRAINING PROGRAMS
          ══════════════════════════════════════ */}
-      <section id="testimonials" className="relative py-28 px-6">
-        {/* Background depth */}
-        <div className="absolute inset-0 bg-gradient-to-b from-void via-surface/40 to-void pointer-events-none" />
-        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[500px] h-[250px] bg-blood/5 rounded-full blur-[100px] pointer-events-none" />
+      <section id="programs" className="relative py-28 px-6 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-void via-surface/35 to-void pointer-events-none" />
+        <div className="absolute top-0 right-0 w-[420px] h-[420px] bg-blood/10 blur-[130px] pointer-events-none" />
 
         <div className="relative z-10 mx-auto max-w-6xl">
-          <SectionHeading sub="Real Results">
-            Member <span className="text-blood">Stories</span>
+          <SectionHeading sub="Built For Results">
+            Training <span className="text-blood">Programs</span>
           </SectionHeading>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {testimonials.map((t, i) => (
-              <motion.div
-                key={t.name}
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true, margin: "-60px" }}
-                variants={fadeUp}
-                custom={i}
-                whileHover={{ y: -6, transition: { duration: 0.25 } }}
-                className="flex flex-col rounded-2xl border border-white/10 bg-surface/70 p-6 hover:border-blood/50 hover:shadow-xl hover:shadow-blood/10 transition-all duration-300"
-              >
-                {/* Stars */}
-                <div className="flex gap-1 mb-4">
-                  {[...Array(t.rating)].map((_, j) => (
-                    <Star key={j} size={16} className="fill-blood text-blood" />
-                  ))}
-                </div>
-                {/* Feedback */}
-                <p className="text-white/65 text-sm mb-6 italic leading-relaxed flex-1">
-                  &ldquo;{t.feedback}&rdquo;
-                </p>
-                {/* Author */}
-                <div className="flex items-center gap-3 mt-auto">
-                  <img
-                    src={t.avatar}
-                    alt={t.name}
-                    className="h-12 w-12 rounded-full object-cover border-2 border-blood/40 shadow-md"
-                    loading="lazy"
-                  />
-                  <div>
-                    <p className="font-semibold text-light text-sm">{t.name}</p>
-                    <p className="text-xs text-white/40">{t.role}</p>
+          <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={endRevealViewport}
+              variants={splitImage}
+              className="relative rounded-2xl overflow-hidden border border-white/10 shadow-2xl shadow-black/50"
+            >
+              <img
+                src="https://images.unsplash.com/photo-1579758629938-03607ccdbaba?w=1000&q=80&auto=format&fit=crop"
+                alt="Training programs"
+                className="h-[420px] w-full object-cover"
+                loading="lazy"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent" />
+              <div className="absolute bottom-5 left-5 right-5 rounded-xl bg-black/35 backdrop-blur-sm border border-white/15 p-4">
+                <p className="text-sm uppercase tracking-widest text-blood mb-1">Coach Guided</p>
+                <p className="text-white/90 text-sm">Each plan is personalized after your first assessment session.</p>
+              </div>
+            </motion.div>
+
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={endRevealViewport}
+              variants={splitText}
+              className="space-y-5"
+            >
+              {programs.map((program, i) => (
+                <motion.div
+                  key={program.title}
+                  variants={slideInRight}
+                  custom={i}
+                  whileHover={{ y: -6, scale: 1.01 }}
+                  className="rounded-2xl border border-white/10 bg-surface/70 px-5 py-5 hover:border-blood/50 hover:shadow-xl hover:shadow-blood/20 transition-all duration-300"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="mt-0.5 inline-flex h-11 w-11 items-center justify-center rounded-xl bg-blood/20 text-blood">
+                      <program.icon size={22} />
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-widest text-white/50 mb-1">{program.duration}</p>
+                      <h3 className="text-lg font-bold text-light mb-1">{program.title}</h3>
+                      <p className="text-sm text-white/65 leading-relaxed">{program.desc}</p>
+                    </div>
                   </div>
-                </div>
+                </motion.div>
+              ))}
+
+              <motion.div variants={fadeUp}>
+                <Link to="/register">
+                  <Button className="liquid-btn gap-2" size="lg">
+                    Start Your Program <ArrowRight size={18} />
+                  </Button>
+                </Link>
               </motion.div>
-            ))}
+            </motion.div>
           </div>
         </div>
       </section>
@@ -583,7 +733,7 @@ export default function LandingPage() {
         <motion.div
           initial="hidden"
           whileInView="visible"
-          viewport={{ once: true, margin: "-80px" }}
+          viewport={endRevealViewport}
           variants={fadeUp}
           className="relative z-10 mx-auto max-w-3xl text-center"
         >
@@ -600,14 +750,14 @@ export default function LandingPage() {
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link to="/register">
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}>
-                <Button size="xl" className="gap-2 text-base px-10">
+                <Button size="xl" className="gap-2 text-base px-10 liquid-btn">
                   Join Today <ArrowRight size={20} />
                 </Button>
               </motion.div>
             </Link>
             <Link to="/login">
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}>
-                <Button variant="outline" size="xl" className="text-base px-10 backdrop-blur-sm">
+                <Button variant="outline" size="xl" className="text-base px-10 backdrop-blur-sm liquid-btn">
                   Sign In
                 </Button>
               </motion.div>
@@ -628,10 +778,10 @@ export default function LandingPage() {
             {/* Brand */}
             <div>
               <Link to="/" className="font-display text-2xl font-bold tracking-wider inline-block mb-4">
-                GYM<span className="text-blood">WEB</span>
+                Om Muruga <span className="text-blood">Olympia Fitness</span>
               </Link>
               <p className="text-sm text-white/50 leading-relaxed">
-                Transform your body, transform your life. Premium fitness experiences since 2015.
+                Transform your body, transform your life. Premium fitness experiences since 2024.
               </p>
             </div>
             {/* Links */}
@@ -642,30 +792,32 @@ export default function LandingPage() {
                 <li><a href="#facilities" className="hover:text-blood transition">Facilities</a></li>
                 <li><a href="#plans" className="hover:text-blood transition">Membership</a></li>
                 <li><a href="#gallery" className="hover:text-blood transition">Gallery</a></li>
+                <li><a href="#programs" className="hover:text-blood transition">Programs</a></li>
               </ul>
             </div>
             {/* Hours */}
             <div>
               <h4 className="font-bold text-light mb-4">Working Hours</h4>
               <ul className="space-y-2 text-sm text-white/50">
-                <li className="flex items-center gap-2"><Clock size={14} className="text-blood" /> Mon–Fri: 6 AM – 11 PM</li>
-                <li className="flex items-center gap-2"><Clock size={14} className="text-blood" /> Sat–Sun: 7 AM – 10 PM</li>
+                <li className="flex items-center gap-2"><Clock size={14} className="text-blood" />Morning: Mon–Sat: 5 AM – 9 AM</li>
+                <li className="flex items-center gap-2"><Clock size={14} className="text-blood" />Evening:Mon–Sat: 4 PM – 9 PM</li>
+                <li className="flex items-center gap-2"><Clock size={14} className="text-blood" />Sun: Close</li>
               </ul>
             </div>
             {/* Contact */}
             <div>
               <h4 className="font-bold text-light mb-4">Contact</h4>
               <ul className="space-y-2 text-sm text-white/50">
-                <li className="flex items-center gap-2"><Phone size={14} className="text-blood" /> +91 XXXX XXXX XX</li>
-                <li className="flex items-center gap-2"><Mail size={14} className="text-blood" /> info@gymweb.com</li>
-                <li className="flex items-center gap-2"><MapPin size={14} className="text-blood" /> Gym Street, City</li>
+                <li className="flex items-center gap-2"><Phone size={14} className="text-blood" /> +91 8925148138</li>
+                <li className="flex items-center gap-2"><Mail size={14} className="text-blood" /> massmanikanta70@gmail.com</li>
+                <li className="flex items-center gap-2"><MapPin size={14} className="text-blood" /> Vatrap Road, near Petrol Bunk Krishnan Kovil, TN</li>
               </ul>
             </div>
           </div>
 
           <div className="border-t border-white/5 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
             <p className="text-xs text-white/30">
-              &copy; {new Date().getFullYear()} GymWeb. All rights reserved.
+              &copy; {new Date().getFullYear()} Om Muruga Olympia Fitness. All rights reserved.
             </p>
             <div className="flex gap-6 text-xs text-white/30">
               <a href="#" className="hover:text-blood transition">Privacy Policy</a>

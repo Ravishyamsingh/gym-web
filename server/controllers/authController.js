@@ -1,17 +1,62 @@
 const User = require("../models/User");
+const jwt = require("jsonwebtoken");
 const admin = require("../config/firebase");
+const JWT_SECRET = process.env.JWT_SECRET;
 
-// ── Helper: extract & verify Firebase ID-token from Authorization header ──
-async function verifyAuthHeader(req) {
-  const header = req.headers.authorization;
-  if (!header || !header.startsWith("Bearer ")) {
-    return null;
-  }
-  const idToken = header.split("Bearer ")[1];
-  return admin.auth().verifyIdToken(idToken);
+function getAdminEmailSet() {
+  const raw = [process.env.ADMIN_EMAIL || "", process.env.ADMIN_EMAILS || ""]
+    .filter(Boolean)
+    .join(",");
+
+  return new Set(
+    raw
+      .split(",")
+      .map((v) => v.trim().toLowerCase())
+      .filter(Boolean)
+  );
 }
 
-// ── Helper: validate faceDescriptor (must be array of exactly 128 numbers) ──
+function isAdminEmail(email) {
+  if (!email) return false;
+  return getAdminEmailSet().has(String(email).trim().toLowerCase());
+}
+
+function sanitizePasswordForStorage(password) {
+  if (typeof password !== "string") return "";
+  return password.replace(/[\u0000-\u001F\u007F]/g, "");
+}
+
+function validateEmail(email) {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
+
+function validateUserId(userId) {
+  // Alphanumeric, underscore, hyphen, 3-20 characters
+  const userIdRegex = /^[a-z0-9_-]{3,20}$/i;
+  return userIdRegex.test(userId);
+}
+
+function validatePassword(password) {
+  // 8-64 chars, at least one uppercase, lowercase, number, special char, no spaces
+  if (typeof password !== "string") {
+    return { valid: false, message: "Password is required" };
+  }
+
+  const sanitized = password.replace(/[\u0000-\u001F\u007F]/g, "");
+  const strongRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9])\S{8,64}$/;
+
+  if (!strongRegex.test(sanitized)) {
+    return {
+      valid: false,
+      message:
+        "Password must be 8-64 characters and include uppercase, lowercase, number, and special character.",
+    };
+  }
+
+  return { valid: true, sanitized };
+}
+
 function isValidFaceDescriptor(fd) {
   return (
     Array.isArray(fd) &&
@@ -20,145 +65,350 @@ function isValidFaceDescriptor(fd) {
   );
 }
 
-// ─────────────────��───────────────────────────
-// POST /api/auth/register
-// Security: requires a valid Firebase ID-token in the Authorization header.
-// The decoded uid must match the firebaseId in the request body.
-// Also validates faceDescriptor strictly (128 numeric values).
-// ─────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
+// PASSWORD-BASED AUTHENTICATION
+// ═════════════════════════════════════════════════════════════════════════════
+
+/**
+ * POST /api/auth/register
+ * Password-based signup with email or userId
+ * Body: { email, userId, password, name }
+ */
 exports.register = async (req, res, next) => {
   try {
-    // ── Firebase token verification ──────────────────────────
-    const decoded = await verifyAuthHeader(req);
-    if (!decoded) {
-      return res.status(401).json({ error: "Authorization Bearer token is required" });
+    const { email, userId, password, name } = req.body;
+    const normalizedEmail = String(email || "").trim().toLowerCase();
+    const normalizedUserId = userId ? String(userId).trim().toLowerCase() : null;
+
+    // Validation
+    if (!email || !password || !name) {
+      return res.status(400).json({
+        error: "Email, password, and name are required",
+      });
     }
 
-    const { firebaseId, name, email, faceDescriptor, authProvider } = req.body;
-
-    if (!firebaseId || !name || !email) {
-      return res.status(400).json({ error: "firebaseId, name, and email are required" });
+    if (!validateEmail(normalizedEmail)) {
+      return res.status(400).json({ error: "Invalid email format" });
     }
 
-    // ── Ensure the token uid matches the firebaseId being stored ──
-    if (decoded.uid !== firebaseId) {
-      return res.status(401).json({ error: "Token uid does not match the provided firebaseId" });
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.valid) {
+      return res.status(400).json({
+        error: passwordValidation.message,
+      });
     }
 
-    // ── Validate faceDescriptor if provided ──────────────────
-    // Allow empty array for Google users, but if provided must be exactly 128 values
-    if (faceDescriptor && faceDescriptor.length > 0 && !isValidFaceDescriptor(faceDescriptor)) {
-      return res.status(400).json({ error: "faceDescriptor must be an array of exactly 128 numeric values" });
+    if (userId && !validateUserId(userId)) {
+      return res.status(400).json({
+        error:
+          "User ID must be 3-20 characters, alphanumeric (a-z, 0-9, _, -)",
+      });
     }
 
-    // Prevent duplicate registrations
-    const existing = await User.findOne({ firebaseId });
-    if (existing) {
-      return res.status(409).json({ error: "User already registered" });
+    // Check for existing email
+    const existingEmail = await User.findOne({ email: normalizedEmail });
+    if (existingEmail) {
+      return res.status(409).json({
+        error: "Email already registered. Please login instead.",
+      });
     }
 
-    // Auto-assign admin role if the email matches ADMIN_EMAIL env var
-    const role = email.toLowerCase() === (process.env.ADMIN_EMAIL || "").toLowerCase() ? "admin" : "user";
+    // Check for existing userId
+    if (userId) {
+      const existingUserId = await User.findOne({
+        userId: normalizedUserId,
+      });
+      if (existingUserId) {
+        return res.status(409).json({
+          error: "User ID already taken. Please choose a different one.",
+        });
+      }
+    }
 
-    const user = await User.create({
-      firebaseId,
-      name,
-      email: email.toLowerCase(),
-      role,
-      faceDescriptor: faceDescriptor || [],
-      authProvider: authProvider || "email",
+    // Create user
+    const user = new User({
+      email: normalizedEmail,
+      userId: normalizedUserId,
+      password: passwordValidation.sanitized,
+      name: name.trim(),
+      authProvider: "password",
+      role: isAdminEmail(normalizedEmail) ? "admin" : "user",
     });
 
-    return res.status(201).json({ message: "User registered", user });
+    await user.save();
+
+    console.log(`[REGISTER] New user created: ${user.email}`);
+
+    // Generate JWT token for password-based auth
+    const jwtToken = jwt.sign(
+      { userId: user._id.toString(), email: user.email, authType: "password" },
+      JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    // Return user without password
+    return res.status(201).json({
+      message: "Account created successfully. Please login.",
+      user: user.toJSON(),
+      jwtToken: jwtToken,
+    });
   } catch (err) {
-    // Firebase token verification errors surface here
-    if (err.code === "auth/argument-error" || err.code === "auth/id-token-expired") {
-      return res.status(401).json({ error: "Invalid or expired Firebase token" });
-    }
-    // MongoDB duplicate key error (email already exists)
     if (err.code === 11000) {
-      return res.status(409).json({ error: "A user with this email already exists" });
+      const field = Object.keys(err.keyPattern)[0];
+      console.error(`[REGISTER] Duplicate key on ${field}`);
+      return res.status(409).json({
+        error: `This ${field} is already registered.`,
+      });
     }
+    console.error("[REGISTER] Error:", err.message);
     next(err);
   }
 };
 
-// ─────────────────────────────────────────────
-// POST /api/auth/login
-// Security: requires a valid Firebase ID-token in the Authorization header.
-// The decoded uid is used to look up the MongoDB user (not the client body).
-// Returns 404 if no Mongo doc exists so the client can redirect to registration.
-// ─────────────────────────────────────────────
+/**
+ * POST /api/auth/login
+ * Password-based login with email or userId
+ * Body: { email or userId, password }
+ */
 exports.login = async (req, res, next) => {
   try {
-    // ── Firebase token verification ──────────────────���───────
-    const decoded = await verifyAuthHeader(req);
-    if (!decoded) {
-      return res.status(401).json({ error: "Authorization Bearer token is required" });
+    const { email, userId, password } = req.body;
+    const normalizedEmail = email ? String(email).trim().toLowerCase() : "";
+    const normalizedUserId = userId ? String(userId).trim().toLowerCase() : "";
+    const normalizedPassword = sanitizePasswordForStorage(password);
+
+    // Validation
+    if (!normalizedPassword) {
+      return res.status(400).json({ error: "Password is required" });
     }
 
-    // Use the verified uid from the token — never trust client-supplied firebaseId
-    const user = await User.findOne({ firebaseId: decoded.uid });
+    if (!normalizedEmail && !normalizedUserId) {
+      return res.status(400).json({
+        error: "Email or User ID is required",
+      });
+    }
+
+    // Find user by email or userId
+    let query = {};
+    if (normalizedEmail) {
+      query.email = normalizedEmail;
+    } else if (normalizedUserId) {
+      query.userId = normalizedUserId;
+    }
+
+    const user = await User.findOne(query).select("+password");
+
     if (!user) {
-      return res.status(404).json({ error: "User not found — complete registration first" });
+      console.warn(
+        `[LOGIN] User not found: ${email || userId}`
+      );
+      return res.status(401).json({
+        error:
+          "Invalid credentials. Please check your email/user ID and password, or create an account.",
+      });
     }
 
-    // Check if user profile is complete (has face descriptor and active payment)
-    const profileComplete = 
-      user.faceRegistered === true && 
-      user.paymentStatus === "active";
+    if (user.isBlocked) {
+      console.warn(`[LOGIN] Blocked user attempted login: ${user.email}`);
+      return res.status(403).json({
+        error: "Your account has been blocked. Contact support.",
+      });
+    }
 
-    return res.json({ 
-      message: "Login successful", 
-      user,
-      profileComplete 
+    // Verify password
+    let isValid = false;
+    if (user.password) {
+      isValid = await user.comparePassword(normalizedPassword);
+    }
+    if (!isValid) {
+      console.warn(`[LOGIN] Invalid password for user: ${user.email}`);
+      return res.status(401).json({
+        error:
+          "Invalid credentials. Please check your email/user ID and password.",
+      });
+    }
+
+    console.log(`[LOGIN] Successful login: ${user.email}`);
+
+    // Generate JWT token for password-based auth
+    const jwtToken = jwt.sign(
+      { userId: user._id.toString(), email: user.email, authType: "password" },
+      JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    // Check onboarding status
+    const profileComplete =
+      user.faceRegistered === true && user.paymentStatus === "active";
+
+    return res.json({
+      message: "Login successful",
+      user: user.toJSON(),
+      jwtToken: jwtToken,
+      profileComplete,
     });
   } catch (err) {
-    // Firebase token verification errors surface here
-    if (err.code === "auth/argument-error" || err.code === "auth/id-token-expired") {
-      return res.status(401).json({ error: "Invalid or expired Firebase token" });
-    }
+    console.error("[LOGIN] Error:", err.message);
     next(err);
   }
 };
 
-// ─────────────────────────────────────────────
-// GET /api/auth/check-user
-// Public endpoint: check if a user exists by email
-// Returns { exists: boolean }
-// ─────────────────────────────────────────────
-exports.checkUserExists = async (req, res, next) => {
+// ═════════════════════════════════════════════════════════════════════════════
+// FIREBASE AUTHENTICATION (LEGACY - For backwards compatibility)
+// ═════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Helper: Verify Firebase ID token
+ */
+async function verifyFirebaseToken(req) {
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith("Bearer ")) {
+    return null;
+  }
+
+  const idToken = header.split("Bearer ")[1];
+  if (!idToken || idToken.trim() === "") {
+    return null;
+  }
+
   try {
-    const { email } = req.query;
-    
-    if (!email) {
-      return res.status(400).json({ error: "Email is required" });
+    return await admin.auth().verifyIdToken(idToken);
+  } catch (err) {
+    console.error("[FIREBASE] Token verification failed:", err.code);
+    throw err;
+  }
+}
+
+/**
+ * POST /api/auth/firebase/register
+ * Firebase-based signup (deprecated, for legacy clients)
+ */
+exports.firebaseRegister = async (req, res, next) => {
+  try {
+    const decoded = await verifyFirebaseToken(req);
+    if (!decoded) {
+      return res.status(401).json({
+        error: "Firebase token required",
+      });
     }
 
-    const user = await User.findOne({ email: email.toLowerCase() });
-    return res.json({ exists: !!user });
+    const { name, email, faceDescriptor } = req.body;
+
+    if (!name || !email) {
+      return res.status(400).json({
+        error: "Name and email are required",
+      });
+    }
+
+    if (faceDescriptor && !isValidFaceDescriptor(faceDescriptor)) {
+      return res.status(400).json({
+        error: "Invalid face descriptor",
+      });
+    }
+
+    // Check for existing email
+    const existing = await User.findOne({ email: email.toLowerCase() });
+    if (existing) {
+      return res.status(409).json({
+        error: "Email already registered",
+      });
+    }
+
+    const user = new User({
+      firebaseId: decoded.uid,
+      name,
+      email: email.toLowerCase(),
+      faceDescriptor: faceDescriptor || [],
+      authProvider: "google",
+      role: isAdminEmail(email) ? "admin" : "user",
+    });
+
+    await user.save();
+
+    console.log(`[FIREBASE-REGISTER] User created: ${user.email}`);
+
+    return res.status(201).json({
+      message: "User registered",
+      user,
+    });
   } catch (err) {
+    if (err.code === "auth/argument-error" ||
+      err.code === "auth/id-token-expired"
+    ) {
+      return res.status(401).json({
+        error: "Invalid or expired Firebase token",
+      });
+    }
+    console.error("[FIREBASE-REGISTER] Error:", err.message);
     next(err);
   }
 };
 
-// ─────────────────────────────────────────────
-// POST /api/auth/google
-// Google authentication: login existing user or auto-register new one.
-// Requires a valid Firebase ID-token from Google sign-in.
-// ─────────────────────────────────────────────
+/**
+ * POST /api/auth/firebase/login
+ * Firebase-based login (deprecated, for legacy clients)
+ */
+exports.firebaseLogin = async (req, res, next) => {
+  try {
+    const decoded = await verifyFirebaseToken(req);
+    if (!decoded) {
+      return res.status(401).json({
+        error: "Firebase token required",
+      });
+    }
+
+    const user = await User.findOne({ firebaseId: decoded.uid });
+
+    if (!user) {
+      console.warn(
+        `[FIREBASE-LOGIN] User not found for Firebase UID: ${decoded.uid}`
+      );
+      return res.status(404).json({
+        error:
+          "User not found — please complete registration first",
+      });
+    }
+
+    console.log(`[FIREBASE-LOGIN] Successful: ${user.email}`);
+
+    const profileComplete =
+      user.faceRegistered === true && user.paymentStatus === "active";
+
+    return res.json({
+      message: "Login successful",
+      user,
+      profileComplete,
+    });
+  } catch (err) {
+    if (err.code === "auth/argument-error" ||
+      err.code === "auth/id-token-expired"
+    ) {
+      return res.status(401).json({
+        error: "Invalid or expired Firebase token",
+      });
+    }
+    console.error("[FIREBASE-LOGIN] Error:", err.message);
+    next(err);
+  }
+};
+
+/**
+ * POST /api/auth/google
+ * Google OAuth login / auto-register
+ */
 exports.googleAuth = async (req, res, next) => {
   try {
-    const decoded = await verifyAuthHeader(req);
+    const decoded = await verifyFirebaseToken(req);
     if (!decoded) {
-      return res.status(401).json({ error: "Authorization Bearer token is required" });
+      return res.status(401).json({
+        error: "Firebase token required",
+      });
     }
 
-    // Try to find existing user
     let user = await User.findOne({ firebaseId: decoded.uid });
 
     if (user) {
-      // Existing user — login
+      console.log(`[GOOGLE-AUTH] Existing user: ${user.email}`);
       const profileComplete =
         user.faceRegistered === true &&
         user.paymentStatus === "active";
@@ -171,32 +421,42 @@ exports.googleAuth = async (req, res, next) => {
       });
     }
 
-    // New Google user — auto-register
+    // Auto-register new Google user
     const { name, email } = req.body;
-    const displayName = name || decoded.name || (decoded.email ? decoded.email.split("@")[0] : "User");
+    const displayName =
+      name ||
+      decoded.name ||
+      (decoded.email ? decoded.email.split("@")[0] : "User");
     const userEmail = (email || decoded.email || "").toLowerCase();
 
     if (!userEmail) {
-      return res.status(400).json({ error: "Email is required for registration" });
+      return res.status(400).json({
+        error: "Email required for registration",
+      });
     }
 
-    // Check if email is already taken by another account
     const existingEmail = await User.findOne({ email: userEmail });
     if (existingEmail) {
-      return res.status(409).json({ error: "An account with this email already exists. Please use email login." });
+      console.warn(
+        `[GOOGLE-AUTH] Email already registered: ${userEmail}`
+      );
+      return res.status(409).json({
+        error:
+          "Email already registered with another account. Please login instead.",
+      });
     }
 
-    // Auto-assign admin role if the email matches ADMIN_EMAIL env var
-    const role = userEmail === (process.env.ADMIN_EMAIL || "").toLowerCase() ? "admin" : "user";
-
-    user = await User.create({
+    user = new User({
       firebaseId: decoded.uid,
       name: displayName,
       email: userEmail,
-      role,
-      faceDescriptor: [],
       authProvider: "google",
+      role: isAdminEmail(userEmail) ? "admin" : "user",
     });
+
+    await user.save();
+
+    console.log(`[GOOGLE-AUTH] New user registered: ${userEmail}`);
 
     return res.status(201).json({
       message: "User registered via Google",
@@ -205,9 +465,44 @@ exports.googleAuth = async (req, res, next) => {
       isNewUser: true,
     });
   } catch (err) {
-    if (err.code === "auth/argument-error" || err.code === "auth/id-token-expired") {
-      return res.status(401).json({ error: "Invalid or expired Firebase token" });
+    if (err.code === "auth/argument-error" ||
+      err.code === "auth/id-token-expired"
+    ) {
+      return res.status(401).json({
+        error: "Invalid or expired Firebase token",
+      });
     }
+    console.error("[GOOGLE-AUTH] Error:", err.message);
+    next(err);
+  }
+};
+
+/**
+ * GET /api/auth/check-user
+ * Public endpoint: check if email exists
+ */
+exports.checkUserExists = async (req, res, next) => {
+  try {
+    const { email } = req.query;
+
+    if (!email) {
+      return res.status(400).json({
+        error: "Email is required",
+      });
+    }
+
+    const user = await User.findOne({
+      email: email.toLowerCase(),
+    });
+
+    return res.json({
+      exists: !!user,
+      message: user
+        ? "User found. Please login."
+        : "User not found. Please create an account.",
+    });
+  } catch (err) {
+    console.error("[CHECK-USER] Error:", err.message);
     next(err);
   }
 };

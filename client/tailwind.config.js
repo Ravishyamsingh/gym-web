@@ -5,7 +5,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        // GymWeb design tokens
+        // Om Muruga Olympia Fitness design tokens
         void: "#000000",
         surface: "#111111",
         light: "#ffffff",

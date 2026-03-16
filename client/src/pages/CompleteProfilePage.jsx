@@ -85,7 +85,7 @@ export default function CompleteProfilePage() {
       >
         <div className="mb-8 text-center">
           <span className="font-display text-3xl font-bold tracking-wider text-light">
-            GYM<span className="text-blood">WEB</span>
+            OM MURUGA <span className="text-blood">OLYMPIA FITNESS</span>
           </span>
         </div>
 

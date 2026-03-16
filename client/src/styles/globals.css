@@ -13,10 +13,32 @@
 
 html {
   scroll-behavior: smooth;
+   animation: ctaPulse 2.6s ease-in-out infinite;
+}
+
+.liquid-btn {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.liquid-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgb(var(--color-blood));
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.35s ease;
+  z-index: -1;
+}
+
+.liquid-btn:hover::before {
+  transform: scaleX(1);
 }
 
 body {
-  background-color: #000000;
+  background-color: #0a0a0a;
   color: #ffffff;
   min-height: 100vh;
 }
@@ -36,9 +58,67 @@ body {
 /* ── Utility layers ─────────────────────── */
 @layer base {
   :root {
-    --color-void: 0 0 0;
-    --color-surface: 17 17 17;
+    --color-void: 10 10 10;
+    --color-surface: 26 26 26;
     --color-light: 255 255 255;
-    --color-blood: 210 10 10;
+    --color-blood: 230 57 70;
+  }
+}
+
+@layer components {
+  .hero-title-shadow {
+    text-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+  }
+
+  .hero-copy-shadow {
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.42);
+  }
+
+  .nav-link {
+    position: relative;
+    transition: color 0.25s ease;
+  }
+
+  .nav-link::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: -7px;
+    width: 100%;
+    height: 2px;
+    background: rgb(var(--color-blood));
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.25s ease;
+  }
+
+  .nav-link:hover {
+    color: rgb(var(--color-blood));
+  }
+
+  .nav-link:hover::after {
+    transform: scaleX(1);
+  }
+
+  .cta-pulse {
+    animation: ctaPulse 3s ease-in-out infinite;
+  }
+}
+
+@keyframes ctaPulse {
+  0%,
+  88%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(230, 57, 70, 0);
+    transform: translateY(0);
+  }
+
+  8% {
+    box-shadow: 0 0 0 0 rgba(230, 57, 70, 0.5);
+  }
+
+  18% {
+    box-shadow: 0 0 0 14px rgba(230, 57, 70, 0);
+    transform: translateY(-1px);
   }
 }

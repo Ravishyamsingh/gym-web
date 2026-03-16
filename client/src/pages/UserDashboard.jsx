@@ -297,6 +297,7 @@ function MonthlyStreakCalendar({ records }) {
 export default function UserDashboard() {
   const { dbUser } = useAuth();
   const [attendance, setAttendance] = useState({ records: [], totalVisits: 0, lastVisit: null, monthlyCounts: [] });
+  const [isInGym, setIsInGym] = useState(false);
   const [loadingAtt, setLoadingAtt] = useState(true);
 
   const isActive = dbUser?.paymentStatus === "active";
@@ -305,7 +306,10 @@ export default function UserDashboard() {
   useEffect(() => {
     if (!isActive) { setLoadingAtt(false); return; }
     api.get("/attendance/my")
-      .then((r) => setAttendance(r.data))
+      .then((r) => {
+        setAttendance(r.data);
+        setIsInGym(!!r.data?.isInGym);
+      })
       .catch(() => {})
       .finally(() => setLoadingAtt(false));
   }, [isActive]);
@@ -427,9 +431,23 @@ export default function UserDashboard() {
                           <RefreshCw size={14} /> Re-register
                         </Button>
                       </Link>
-                      <Link to="/verify">
-                        <Button size="lg" className="gap-2 bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-600/20">
-                          <ScanFace size={20} /> Face Verify & Enter
+                      <Link to="/verify?action=entry">
+                        <Button
+                          size="lg"
+                          className="gap-2 bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-600/20"
+                          disabled={isInGym}
+                        >
+                          <ScanFace size={20} /> {isInGym ? "Already In Gym" : "Face Verify & Enter"}
+                        </Button>
+                      </Link>
+                      <Link to="/verify?action=exit">
+                        <Button
+                          size="lg"
+                          variant="outline"
+                          className="gap-2 border-yellow-500/35 text-yellow-300 hover:bg-yellow-500/10"
+                          disabled={!isInGym}
+                        >
+                          <ScanFace size={20} /> Face Verify & Exit
                         </Button>
                       </Link>
                     </div>

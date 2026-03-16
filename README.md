@@ -1,4 +1,4 @@
-# GymWeb — Premium Fitness Platform
+# Om Muruga Olympia Fitness — Premium Fitness Platform
 
 ## Quick Start
 

@@ -1,9 +1,11 @@
 const admin = require("../config/firebase");
 const User = require("../models/User");
+const jwt = require("jsonwebtoken");
+const JWT_SECRET = process.env.JWT_SECRET;
 
 /**
- * Verify the Firebase ID‑token sent in the Authorization header.
- * Attaches `req.firebaseUser` (decoded token) and `req.dbUser` (Mongo doc).
+ * Verify the Firebase ID‑token OR JWT token sent in the Authorization header.
+ * Attaches `req.firebaseUser` (for Firebase) or `req.jwtUser` (for JWT), and `req.dbUser` (Mongo doc).
  */
 const verifyToken = async (req, res, next) => {
   const header = req.headers.authorization;
@@ -11,17 +13,42 @@ const verifyToken = async (req, res, next) => {
     return res.status(401).json({ error: "No token provided" });
   }
 
+  const token = header.split("Bearer ")[1];
+
   try {
-    const idToken = header.split("Bearer ")[1];
-    const decoded = await admin.auth().verifyIdToken(idToken);
+    // Try to verify as JWT first (password-based auth)
+    try {
+      const decoded = jwt.verify(
+        token,
+        JWT_SECRET
+      );
+
+      // JWT token verified successfully
+      req.jwtUser = decoded;
+
+      // Fetch the MongoDB user document
+      const dbUser = await User.findById(decoded.userId);
+      if (!dbUser) {
+        return res.status(401).json({ error: "User not found in database" });
+      }
+      req.dbUser = dbUser;
+      return next();
+    }
+    catch (_jwtErr) {
+      // JWT verification failed; continue to Firebase token verification.
+      // This supports users with stale/expired JWTs but valid Firebase sessions.
+    }
+
+    // Try Firebase token (OAuth auth)
+    const decoded = await admin.auth().verifyIdToken(token);
     req.firebaseUser = decoded;
 
-    // Attach the MongoDB user document — reject if it doesn't exist.
-    // Security: allowing req.dbUser = null and calling next() would let
-    // unauthenticated users reach protected handlers.
+    // Attach the MongoDB user document
     const dbUser = await User.findOne({ firebaseId: decoded.uid });
     if (!dbUser) {
-      return res.status(401).json({ error: "Unauthorized — user record not found in database" });
+      return res.status(401).json({
+        error: "Unauthorized — user record not found in database",
+      });
     }
     req.dbUser = dbUser;
 

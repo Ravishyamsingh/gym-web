@@ -1,5 +1,8 @@
 const mongoose = require("mongoose");
 
+const ATTENDANCE_RETENTION_DAYS = 30;
+const ATTENDANCE_RETENTION_SECONDS = ATTENDANCE_RETENTION_DAYS * 24 * 60 * 60;
+
 const attendanceSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -7,13 +10,98 @@ const attendanceSchema = new mongoose.Schema({
     required: true,
     index: true,
   },
+  date: {
+    type: Date,
+    default: Date.now,
+    index: true,
+  },
+  entryTime: {
+    type: Date,
+    default: Date.now,
+    index: true,
+  },
+  exitTime: {
+    type: Date,
+    default: null,
+  },
+  currentStatus: {
+    type: String,
+    enum: ["Inside Gym", "Checked Out"],
+    default: "Inside Gym",
+    index: true,
+  },
+  checkInAt: {
+    type: Date,
+    default: Date.now,
+    index: true,
+  },
+  checkOutAt: {
+    type: Date,
+    default: null,
+  },
+  entryVerifiedAt: {
+    type: Date,
+    default: Date.now,
+  },
+  exitVerifiedAt: {
+    type: Date,
+    default: null,
+  },
+  sessionStatus: {
+    type: String,
+    enum: ["in_gym", "completed"],
+    default: "in_gym",
+    index: true,
+  },
+  durationMinutes: {
+    type: Number,
+    default: null,
+  },
   timestamp: {
     type: Date,
     default: Date.now,
   },
+  verificationMethodEntry: {
+    type: String,
+    enum: ["face", "email_otp", null],
+    default: "face",
+  },
+  verificationMethodExit: {
+    type: String,
+    enum: ["face", "email_otp", null],
+    default: null,
+  },
+});
+
+attendanceSchema.pre("validate", function syncCompatibilityFields(next) {
+  const effectiveEntry = this.entryTime || this.checkInAt || this.timestamp || new Date();
+
+  if (!this.entryTime) this.entryTime = effectiveEntry;
+  if (!this.checkInAt) this.checkInAt = effectiveEntry;
+  if (!this.date) {
+    const day = new Date(effectiveEntry);
+    day.setHours(0, 0, 0, 0);
+    this.date = day;
+  }
+
+  if (!this.exitTime && this.checkOutAt) this.exitTime = this.checkOutAt;
+  if (!this.checkOutAt && this.exitTime) this.checkOutAt = this.exitTime;
+
+  if (!this.currentStatus && this.sessionStatus) {
+    this.currentStatus = this.sessionStatus === "completed" ? "Checked Out" : "Inside Gym";
+  }
+  if (!this.sessionStatus && this.currentStatus) {
+    this.sessionStatus = this.currentStatus === "Checked Out" ? "completed" : "in_gym";
+  }
+
+  next();
 });
 
 // Compound index for fast "who's in the gym right now?" queries
 attendanceSchema.index({ timestamp: -1 });
+attendanceSchema.index({ userId: 1, sessionStatus: 1, checkInAt: -1 });
+attendanceSchema.index({ userId: 1, currentStatus: 1, entryTime: -1 });
+// Auto-delete attendance documents older than 30 days.
+attendanceSchema.index({ timestamp: 1 }, { expireAfterSeconds: ATTENDANCE_RETENTION_SECONDS });
 
 module.exports = mongoose.model("Attendance", attendanceSchema);

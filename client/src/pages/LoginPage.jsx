@@ -5,19 +5,20 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { motion } from "framer-motion";
-import { Chrome } from "lucide-react";
+import { Chrome, Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage() {
-  const { login, loginWithGoogle } = useAuth();
+  const { loginWithPassword, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
 
-  const [email, setEmail] = useState("");
+  const [emailOrUserId, setEmailOrUserId] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
-  // Redirect after auth — all users go to dashboard first
+  // Redirect based on user role
   const navigateAfterAuth = (user) => {
     if (user.role === "admin") {
       navigate("/admin");
@@ -32,10 +33,17 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const user = await login(email, password);
+      // Determine if it's email or userId
+      const isEmail = emailOrUserId.includes("@");
+      
+      const user = await loginWithPassword(
+        isEmail ? { email: emailOrUserId } : { userId: emailOrUserId },
+        password
+      );
       navigateAfterAuth(user);
     } catch (err) {
-      setError(err.response?.data?.error || err.message || "Login failed");
+      const errorMsg = err.response?.data?.error || err.message || "Login failed";
+      setError(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -49,7 +57,8 @@ export default function LoginPage() {
       const user = await loginWithGoogle();
       navigateAfterAuth(user);
     } catch (err) {
-      setError(err.response?.data?.error || err.message || "Google sign-in failed");
+      const errorMsg = err.response?.data?.error || err.message || "Google sign-in failed";
+      setError(errorMsg);
     } finally {
       setGoogleLoading(false);
     }
@@ -66,40 +75,72 @@ export default function LoginPage() {
         {/* Brand */}
         <Link to="/" className="mb-8 block text-center">
           <span className="font-display text-3xl font-bold tracking-wider text-light">
-            GYM<span className="text-blood">WEB</span>
+            OM MURUGA <span className="text-blood">OLYMPIA FITNESS</span>
           </span>
         </Link>
 
-        <h1 className="mb-6 text-center text-xl font-semibold text-light">Welcome back</h1>
+        <h1 className="mb-6 text-center text-xl font-semibold text-light">
+          Welcome back
+        </h1>
 
+        {/* Error Message */}
         {error && (
-          <div className="mb-4 rounded-lg bg-blood/10 border border-blood/30 px-4 py-2 text-sm text-blood">
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-4 rounded-lg bg-blood/10 border border-blood/30 px-4 py-3 text-sm text-blood"
+          >
             {error}
-          </div>
+          </motion.div>
         )}
 
+        {/* Login Form */}
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="emailOrUserId">Email or User ID</Label>
             <Input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              id="emailOrUserId"
+              type="text"
+              placeholder="example@gmail.com or username"
+              value={emailOrUserId}
+              onChange={(e) => setEmailOrUserId(e.target.value.trim())}
+              disabled={loading}
               required
             />
           </div>
+
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={loading}
+                autoComplete="current-password"
+                className="pr-10"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="absolute inset-y-0 right-0 flex items-center px-3 text-white/50 hover:text-white/80 transition-colors"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                disabled={loading}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
-          <Button type="submit" className="w-full" size="lg" disabled={loading}>
+
+          <Button
+            type="submit"
+            className="w-full"
+            size="lg"
+            disabled={loading || !emailOrUserId || !password}
+          >
             {loading ? "Signing in…" : "Log In"}
           </Button>
         </form>
@@ -111,23 +152,24 @@ export default function LoginPage() {
           <div className="flex-1 border-t border-white/10" />
         </div>
 
-        {/* Google Sign-In Button */}
+        {/* Google Sign-In */}
         <Button
           type="button"
           variant="outline"
           className="w-full"
           size="lg"
-          disabled={googleLoading}
+          disabled={googleLoading || loading}
           onClick={handleGoogleSignIn}
         >
           <Chrome className="mr-2 h-4 w-4" />
           {googleLoading ? "Signing in…" : "Continue with Google"}
         </Button>
 
+        {/* Sign Up Link */}
         <p className="mt-6 text-center text-sm text-white/40">
           Don&apos;t have an account?{" "}
           <Link to="/register" className="text-blood hover:underline">
-            Sign Up
+            Create Account
           </Link>
         </p>
       </motion.div>

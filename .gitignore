@@ -1,6 +1,13 @@
 node_modules/
 dist/
 .env
+*.env*
+package-lock.json
+*.backup
+*.bak
+.qodo/
+.vscode/
+client/public/models/
 *.log
 .DS_Store
 Thumbs.db

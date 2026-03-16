@@ -1,22 +1,40 @@
 const router = require("express").Router();
 const rateLimit = require("express-rate-limit");
-const { register, login, checkUserExists, googleAuth } = require("../controllers/authController");
+const {
+  register,
+  login,
+  checkUserExists,
+  firebaseRegister,
+  firebaseLogin,
+  googleAuth,
+} = require("../controllers/authController");
 
-// ── Rate limiter for public auth endpoints ──────────────────────
-// Prevents brute-force and abuse: max 5 requests per minute per IP.
+// Rate limiters
 const authLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 5,              // 5 requests per window per IP
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 attempts per window
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: "Too many requests — please try again after a minute" },
+  message: { error: "Too many login/signup attempts. Please try again later." },
 });
 
-// Public routes — Firebase token is now verified inside each controller,
-// and rate limiting protects against abuse.
+const googleLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// PASSWORD-BASED AUTH (primary)
 router.post("/register", authLimiter, register);
 router.post("/login", authLimiter, login);
-router.post("/google", authLimiter, googleAuth);
+
+// FIREBASE AUTH (legacy / Google OAuth)
+router.post("/firebase/register", authLimiter, firebaseRegister);
+router.post("/firebase/login", authLimiter, firebaseLogin);
+router.post("/google", googleLimiter, googleAuth);
+
+// PUBLIC
 router.get("/check-user", checkUserExists);
 
 module.exports = router;

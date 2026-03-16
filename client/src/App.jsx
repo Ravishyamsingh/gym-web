@@ -12,6 +12,7 @@ import VerifyFace from "./pages/VerifyFace";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminMembers from "./pages/admin/AdminMembers";
 import AdminPayments from "./pages/admin/AdminPayments";
+import AdminAttendance from "./pages/admin/AdminAttendance";
 import AdminSettings from "./pages/admin/AdminSettings";
 import MembershipPage from "./pages/onboarding/MembershipPage";
 import PaymentPage from "./pages/onboarding/PaymentPage";
@@ -96,6 +97,7 @@ export default function App() {
           <Route index element={<AdminDashboard />} />
           <Route path="members" element={<AdminMembers />} />
           <Route path="payments" element={<AdminPayments />} />
+          <Route path="attendance" element={<AdminAttendance />} />
           <Route path="settings" element={<AdminSettings />} />
         </Route>
 

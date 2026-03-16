@@ -4,7 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { User, LogOut, ChevronDown } from "lucide-react";
 
-export default function AccountDropdown() {
+export default function AccountDropdown({ inGymStatus }) {
   const { dbUser, logout } = useAuth();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
@@ -71,6 +71,8 @@ export default function AccountDropdown() {
       ? "1 Year"
       : "—";
 
+  const showInGym = !!inGymStatus?.isInGym;
+
   return (
     <div className="relative" ref={dropdownRef}>
       {/* Account Button */}
@@ -114,6 +116,23 @@ export default function AccountDropdown() {
 
             {/* Account Details Section */}
             <div className="px-6 py-4 space-y-3 border-b border-white/5">
+              {showInGym && (
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-white/60">Session</span>
+                  <span
+                    className={`text-xs font-semibold px-2 py-1 rounded-full border ${
+                      inGymStatus?.hasLongSessionAlert
+                        ? "text-yellow-300 border-yellow-500/40 bg-yellow-500/15"
+                        : "text-emerald-300 border-emerald-500/40 bg-emerald-500/15"
+                    }`}
+                  >
+                    {inGymStatus?.hasLongSessionAlert
+                      ? `In Gym - Alert (${inGymStatus?.durationMinutes || 0}m)`
+                      : "In Gym"}
+                  </span>
+                </div>
+              )}
+
               {/* Join Date */}
               <div className="flex justify-between items-center">
                 <span className="text-sm text-white/60">Joined</span>

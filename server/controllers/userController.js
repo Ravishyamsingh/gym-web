@@ -29,6 +29,28 @@ exports.getAllUsers = async (_req, res, next) => {
 };
 
 // ─────────────────────────────────────────────
+// GET /api/users/admin/stats
+// Admin-only: lightweight counts for dashboard cards.
+// ─────────────────────────────────────────────
+exports.getAdminStats = async (_req, res, next) => {
+  try {
+    const [totalUsers, blocked] = await Promise.all([
+      User.countDocuments(),
+      User.countDocuments({ isBlocked: true }),
+    ]);
+
+    return res.json({
+      stats: {
+        totalUsers,
+        blocked,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ─────────────────────────────────────────────
 // PUT /api/users/:id/block
 // Admin‑only: toggle isBlocked flag on a user.
 // ─────────────────────────────────────────────

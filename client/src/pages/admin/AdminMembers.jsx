@@ -2,21 +2,35 @@ import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { ErrorState } from "@/components/ui/ErrorState";
 import { motion } from "framer-motion";
 import api from "@/lib/api";
-import { ShieldOff, ShieldCheck, Download, Edit2 } from "lucide-react";
+import { useToast } from "@/lib/useToast";
+import { ShieldOff, ShieldCheck, Download, Edit2, Check, X, Search, X as XIcon, ChevronLeft, ChevronRight } from "lucide-react";
+
+const ITEMS_PER_PAGE = 10;
 
 export default function AdminMembers() {
+  const { success, error: errorToast } = useToast();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [editingUserId, setEditingUserId] = useState(null);
   const [editingStatus, setEditingStatus] = useState("");
+  const [updatingId, setUpdatingId] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, type: null, userId: null, action: null });
 
   const fetchUsers = async () => {
     try {
+      setError(null);
       const { data } = await api.get("/users");
       setUsers(data.users || []);
     } catch (err) {
+      const errorMsg = err.response?.data?.error || "Failed to load members";
+      setError(errorMsg);
       console.error("Fetch users error:", err);
     } finally {
       setLoading(false);
@@ -27,22 +41,44 @@ export default function AdminMembers() {
     fetchUsers();
   }, []);
 
-  const handleToggleBlock = async (userId) => {
+  const handleToggleBlock = async (userId, currentState) => {
     try {
+      setUpdatingId(userId);
       await api.put(`/users/${userId}/block`);
-      fetchUsers(); // refresh list
+      success(currentState ? "Member unblocked" : "Member blocked");
+      setConfirmDialog({ isOpen: false, type: null, userId: null, action: null });
+      fetchUsers();
     } catch (err) {
+      errorToast("Failed to update member status");
       console.error("Block toggle error:", err);
+    } finally {
+      setUpdatingId(null);
     }
+  };
+
+  const openBlockConfirm = (userId, isCurrentlyBlocked, userName) => {
+    setConfirmDialog({
+      isOpen: true,
+      type: "block",
+      userId,
+      action: isCurrentlyBlocked ? "unblock" : "block",
+      userName,
+      isCurrentlyBlocked,
+    });
   };
 
   const handleUpdatePaymentStatus = async (userId, newStatus) => {
     try {
+      setUpdatingId(userId);
       await api.put(`/users/${userId}/payment-status`, { paymentStatus: newStatus });
+      success(`Payment status updated to ${newStatus}`);
       setEditingUserId(null);
-      fetchUsers(); // refresh list
+      fetchUsers();
     } catch (err) {
+      errorToast("Failed to update payment status");
       console.error("Payment status update error:", err);
+    } finally {
+      setUpdatingId(null);
     }
   };
 
@@ -52,10 +88,12 @@ export default function AdminMembers() {
       const url = window.URL.createObjectURL(new Blob([data]));
       const a = document.createElement("a");
       a.href = url;
-      a.download = "gymweb-report.xlsx";
+      a.download = "om-muruga-olympia-fitness-report.xlsx";
       a.click();
       window.URL.revokeObjectURL(url);
+      success("Report exported successfully");
     } catch (err) {
+      errorToast("Failed to export report");
       console.error("Export error:", err);
     }
   };
@@ -75,6 +113,42 @@ export default function AdminMembers() {
         </Button>
       </div>
 
+      {error && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6"
+        >
+          <ErrorState message={error} onRetry={fetchUsers} />
+        </motion.div>
+      )}
+
+      {/* Search Bar */}
+      <div className="mb-6 relative">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40" size={18} />
+        <input
+          type="text"
+          placeholder="Search by name, email, or user ID…"
+          value={searchQuery}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+            setCurrentPage(1); // Reset to first page on search
+          }}
+          className="w-full bg-surface border border-white/10 text-light placeholder-white/40 rounded-lg pl-10 pr-4 py-2.5 focus:outline-none focus:border-blood transition-colors"
+        />
+        {searchQuery && (
+          <button
+            onClick={() => {
+              setSearchQuery("");
+              setCurrentPage(1);
+            }}
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/60"
+          >
+            <XIcon size={18} />
+          </button>
+        )}
+      </div>
+
       <Card>
         <CardContent>
           {loading ? (
@@ -83,26 +157,98 @@ export default function AdminMembers() {
             <p className="text-sm text-white/40">No members registered yet.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-white/5 text-xs uppercase text-white/40">
-                    <th className="py-3 pr-4">Name</th>
-                    <th className="py-3 pr-4">Email</th>
-                    <th className="py-3 pr-4">Payment</th>
-                    <th className="py-3 pr-4">Status</th>
-                    <th className="py-3 pr-4">Streak</th>
-                    <th className="py-3 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {users.map((u) => (
-                    <tr key={u._id} className="hover:bg-white/[0.02] transition-colors">
-                      <td className="py-3 pr-4 font-medium text-light">{u.name}</td>
+              {(() => {
+                const filtered = users.filter((u) =>
+                  (u.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  (u.email || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  (u.userId || "").toLowerCase().includes(searchQuery.toLowerCase())
+                );
+
+                if (filtered.length === 0) {
+                  return (
+                    <div className="text-center py-8 text-white/40 text-sm">
+                      No members match "{searchQuery}"
+                    </div>
+                  );
+                }
+
+                const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+                const startIdx = (currentPage - 1) * ITEMS_PER_PAGE;
+                const paginatedUsers = filtered.slice(startIdx, startIdx + ITEMS_PER_PAGE);
+
+                return (
+                  <>
+                    <table className="w-full text-left text-sm">
+                      <thead>
+                      <tr className="border-b border-white/5 text-xs uppercase text-white/40">
+                        <th className="py-3 pr-4">Name</th>
+                        <th className="py-3 pr-4">Email</th>
+                        <th className="py-3 pr-4">User ID</th>
+                        <th className="py-3 pr-4">Payment</th>
+                        <th className="py-3 pr-4">Status</th>
+                        <th className="py-3 pr-4">Streak</th>
+                        <th className="py-3 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {paginatedUsers.map((u) => (
+                        <tr key={u._id} className="hover:bg-white/[0.02] transition-colors">
+                          <td className="py-3 pr-4 font-medium text-light">{u.name}</td>
                       <td className="py-3 pr-4 text-white/60">{u.email}</td>
+                      <td className="py-3 pr-4 text-white/60">{u.userId || "—"}</td>
                       <td className="py-3 pr-4">
-                        <Badge variant={u.paymentStatus === "active" ? "active" : u.paymentStatus === "pending" ? "pending" : "expired"}>
-                          {u.paymentStatus}
-                        </Badge>
+                        {editingUserId === u._id ? (
+                          <motion.div
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="flex items-center gap-2"
+                          >
+                            <select
+                              value={editingStatus}
+                              onChange={(e) => setEditingStatus(e.target.value)}
+                              className="bg-white/5 border border-white/10 text-light text-xs rounded px-2 py-1 focus:outline-none focus:border-blood"
+                            >
+                              <option value="active">Active</option>
+                              <option value="pending">Pending</option>
+                              <option value="expired">Expired</option>
+                            </select>
+                            <button
+                              onClick={() => handleUpdatePaymentStatus(u._id, editingStatus)}
+                              disabled={updatingId === u._id}
+                              className="text-emerald-400 hover:text-emerald-300 disabled:opacity-50"
+                            >
+                              <Check size={14} />
+                            </button>
+                            <button
+                              onClick={() => setEditingUserId(null)}
+                              disabled={updatingId === u._id}
+                              className="text-white/40 hover:text-white/60 disabled:opacity-50"
+                            >
+                              <X size={14} />
+                            </button>
+                          </motion.div>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setEditingUserId(u._id);
+                              setEditingStatus(u.paymentStatus);
+                            }}
+                            className="inline-flex items-center gap-2 cursor-pointer hover:opacity-75 transition"
+                          >
+                            <Badge
+                              variant={
+                                u.paymentStatus === "active"
+                                  ? "active"
+                                  : u.paymentStatus === "pending"
+                                  ? "pending"
+                                  : "expired"
+                              }
+                            >
+                              {u.paymentStatus}
+                            </Badge>
+                            <Edit2 size={12} className="text-white/40" />
+                          </button>
+                        )}
                       </td>
                       <td className="py-3 pr-4">
                         {u.isBlocked ? (
@@ -116,8 +262,9 @@ export default function AdminMembers() {
                         <Button
                           variant={u.isBlocked ? "outline" : "destructive"}
                           size="sm"
-                          className="gap-1.5 hover:scale-105 transition-transform"
-                          onClick={() => handleToggleBlock(u._id)}
+                          disabled={updatingId === u._id}
+                          className="gap-1.5 hover:scale-105 transition-transform disabled:opacity-50"
+                          onClick={() => openBlockConfirm(u._id, u.isBlocked, u.name)}
                         >
                           {u.isBlocked ? (
                             <>
@@ -134,12 +281,63 @@ export default function AdminMembers() {
                       </td>
                     </tr>
                   ))}
-                </tbody>
-              </table>
+                    </tbody>
+                  </table>
+
+                    {/* Pagination Controls */}
+                    <div className="flex items-center justify-between mt-6 pt-6 border-t border-white/5">
+                      <p className="text-xs text-white/40">
+                        Showing {startIdx + 1}–{Math.min(startIdx + ITEMS_PER_PAGE, filtered.length)} of {filtered.length} members
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={currentPage === 1}
+                          onClick={() => setCurrentPage(currentPage - 1)}
+                          className="gap-1"
+                        >
+                          <ChevronLeft size={16} />
+                          Previous
+                        </Button>
+                        <span className="text-sm text-white/60 px-2">
+                          Page {currentPage} of {totalPages}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={currentPage === totalPages}
+                          onClick={() => setCurrentPage(currentPage + 1)}
+                          className="gap-1"
+                        >
+                          Next
+                          <ChevronRight size={16} />
+                        </Button>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        variant={confirmDialog.action === "block" ? "danger" : "warn"}
+        title={confirmDialog.action === "block" ? "Block Member?" : "Unblock Member?"}
+        message={
+          confirmDialog.action === "block"
+            ? `This will prevent ${confirmDialog.userName} from accessing the gym. They won't be able to check in.`
+            : `${confirmDialog.userName} will regain access to check in with facial recognition.`
+        }
+        confirmText={confirmDialog.action === "block" ? "Block" : "Unblock"}
+        isPending={updatingId === confirmDialog.userId}
+        onConfirm={() => handleToggleBlock(confirmDialog.userId, confirmDialog.isCurrentlyBlocked)}
+        onCancel={() => setConfirmDialog({ isOpen: false, type: null, userId: null, action: null })}
+      />
     </motion.div>
   );
 }

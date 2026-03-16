@@ -1,3 +1,7 @@
 node_modules/
 .env
+*.env*
+*.backup
+*.bak
+package-lock.json
 config/serviceAccountKey.json
