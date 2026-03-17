@@ -33,6 +33,7 @@ export default function VerifyFace() {
 
   const action = searchParams.get("action") === "exit" ? "exit" : "entry";
   const isExitAction = action === "exit";
+  const forceOtpFallback = searchParams.get("fallback") === "otp";
 
   useEffect(() => {
     setFallbackEmail(dbUser?.email || "");
@@ -97,6 +98,14 @@ export default function VerifyFace() {
   const stopCamera = () => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
   };
+
+  useEffect(() => {
+    if (!forceOtpFallback) return;
+    setShowEmailFallback(true);
+    setStatus((prev) => (prev === "idle" ? "denied" : prev));
+    setMessage((prev) => prev || (isExitAction ? "Use OTP to verify your exit." : "Use OTP to verify your entry."));
+    stopCamera();
+  }, [forceOtpFallback, isExitAction]);
 
   const resetFallback = () => {
     setShowEmailFallback(false);
@@ -375,7 +384,7 @@ export default function VerifyFace() {
           </Button>
         )}
 
-        {status === "denied" && showEmailFallback && (
+        {(status === "denied" || forceOtpFallback) && showEmailFallback && (
           <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-4 space-y-3 text-left">
             <p className="text-sm font-semibold text-yellow-300">Email OTP Fallback</p>
             <p className="text-xs text-yellow-200/80">

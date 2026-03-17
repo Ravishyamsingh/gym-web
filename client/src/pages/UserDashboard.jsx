@@ -452,6 +452,33 @@ export default function UserDashboard() {
                       </Link>
                     </div>
                   </div>
+                  <div className="px-5 sm:px-6 pb-5 sm:pb-6 pt-0">
+                    <p className="text-xs text-white/55 text-center sm:text-left">
+                      If face verification fails, continue with secure email OTP fallback.
+                    </p>
+                    <div className="mt-3 flex flex-wrap items-center gap-3">
+                      <Link to="/verify?action=entry&fallback=otp">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-yellow-500/35 text-yellow-300 hover:bg-yellow-500/10"
+                          disabled={isInGym}
+                        >
+                          Use OTP for Entry
+                        </Button>
+                      </Link>
+                      <Link to="/verify?action=exit&fallback=otp">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-yellow-500/35 text-yellow-300 hover:bg-yellow-500/10"
+                          disabled={!isInGym}
+                        >
+                          Use OTP for Exit
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
                 </Card>
               ) : (
                 /* ── Face NOT registered → Register Face CTA ── */
