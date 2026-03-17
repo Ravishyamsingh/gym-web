@@ -32,6 +32,13 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
 
+    // Client-side validation
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      setLoading(false);
+      return;
+    }
+
     try {
       // Determine if it's email or userId
       const isEmail = emailOrUserId.includes("@");
@@ -43,9 +50,23 @@ export default function LoginPage() {
       navigateAfterAuth(user);
     } catch (err) {
       const status = err.response?.status;
-      const errorMsg = status === 504
-        ? "Server is taking too long to respond. Please retry in a few seconds."
-        : (err.response?.data?.error || err.message || "Login failed");
+      let errorMsg = "Login failed. Please try again.";
+
+      if (status === 429) {
+        errorMsg = "Too many login attempts. Please wait 15 minutes before trying again.";
+      } else if (status === 403) {
+        errorMsg = "Your account has been blocked. Please contact support.";
+      } else if (status === 401) {
+        errorMsg = "Invalid email/user ID or password. Please check and try again.";
+      } else if (status === 504 || err.message?.includes("timeout")) {
+        errorMsg = "Server is taking too long to respond. Please check your connection and retry.";
+      } else if (status === 500) {
+        errorMsg = "Server error. Please try again in a few moments.";
+      } else if (!status) {
+        errorMsg = "Network error. Please check your internet connection and try again.";
+      } else {
+        errorMsg = err.response?.data?.error || err.message || "Login failed";
+      }
       setError(errorMsg);
     } finally {
       setLoading(false);
@@ -60,7 +81,22 @@ export default function LoginPage() {
       const user = await loginWithGoogle();
       navigateAfterAuth(user);
     } catch (err) {
-      const errorMsg = err.response?.data?.error || err.message || "Google sign-in failed";
+      const status = err.response?.status;
+      let errorMsg = "Google sign-in failed. Please try again.";
+
+      if (status === 429) {
+        errorMsg = "Too many attempts. Please wait 15 minutes before trying again.";
+      } else if (status === 504 || err.message?.includes("timeout")) {
+        errorMsg = "Sign-in took too long. Please check your connection and retry.";
+      } else if (status === 500) {
+        errorMsg = "Server error. Please try Google sign-in again shortly.";
+      } else if (!status) {
+        errorMsg = "Network error. Please check your internet connection.";
+      } else if (err.message?.includes("popup") || err.message?.includes("window")) {
+        errorMsg = "Google sign-in popup was blocked. Please allow popups and try again.";
+      } else {
+        errorMsg = err.response?.data?.error || err.message || "Google sign-in failed";
+      }
       setError(errorMsg);
     } finally {
       setGoogleLoading(false);
@@ -120,10 +156,11 @@ export default function LoginPage() {
                 type={showPassword ? "text" : "password"}
                 placeholder="••••••"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => setPassword(e.target.value.trim())}
                 disabled={loading}
                 autoComplete="current-password"
                 className="pr-10"
+                minLength={8}
                 required
               />
               <button
@@ -142,7 +179,7 @@ export default function LoginPage() {
             type="submit"
             className="w-full"
             size="lg"
-            disabled={loading || !emailOrUserId || !password}
+            disabled={loading || !emailOrUserId || !password || password.length < 8}
           >
             {loading ? "Signing in…" : "Log In"}
           </Button>

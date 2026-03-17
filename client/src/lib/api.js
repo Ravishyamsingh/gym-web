@@ -24,7 +24,7 @@ const baseURL = (!isLocalHostRuntime && pointsToLocalhost)
 
 const api = axios.create({
   baseURL,
-  timeout: 20000,
+  timeout: 45000,
 });
 
 const PUBLIC_AUTH_ROUTES = [
@@ -53,6 +53,7 @@ function delay(ms) {
 // Attach the Firebase ID-token OR JWT token to every outgoing request
 api.interceptors.request.use(
   async (config) => {
+    config.__startTime = Date.now();
     const requestUrl = String(config?.url || "");
 
     // Public auth routes should never require auth headers.
@@ -107,7 +108,8 @@ api.interceptors.response.use(
 
     // First retry same-origin through Netlify/Vite proxy to avoid CORS issues.
     if (status === 504 && canRetryViaProxy) {
-      await delay(1200);
+      console.warn("[API] 504 timeout on /api proxy, retrying after brief delay...");
+      await delay(300);
       const retryConfig = {
         ...error.config,
         __retriedViaProxy: true,
@@ -135,12 +137,23 @@ api.interceptors.response.use(
       return api.request(retryConfig);
     }
 
-    if (error.response?.status === 500) {
+    if (error.response?.status === 429) {
+      console.warn("Rate limit 429 - Too many requests:", {
+        url: error.config?.url,
+        retryAfter: error.response?.headers?.['retry-after'],
+      });
+    } else if (error.response?.status === 500) {
       console.error("Server error 500 - API call failed:", {
         url: error.config?.url,
         method: error.config?.method,
         data: error.response?.data,
         message: error.response?.data?.error,
+      });
+    } else if (error.code === "ECONNABORTED" || error.message?.includes("timeout")) {
+      console.warn("Request timeout:", {
+        url: error.config?.url,
+        timeout: error.config?.timeout,
+        elapsed: Date.now() - (error.config?.__startTime || 0),
       });
     }
     return Promise.reject(error);

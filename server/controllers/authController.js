@@ -179,10 +179,12 @@ exports.login = async (req, res, next) => {
 
     // Validation
     if (!normalizedPassword) {
+      console.warn("[LOGIN] Password missing from request");
       return res.status(400).json({ error: "Password is required" });
     }
 
     if (!normalizedEmail && !normalizedUserId) {
+      console.warn("[LOGIN] Email/User ID missing from request");
       return res.status(400).json({
         error: "Email or User ID is required",
       });
