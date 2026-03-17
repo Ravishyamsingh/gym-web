@@ -1,6 +1,6 @@
 const Attendance = require("../models/Attendance");
 const crypto = require("crypto");
-const { sendAttendanceOtpEmail } = require("../utils/resendService");
+const { sendAttendanceOtpEmail } = require("../utils/emailService");
 
 const ATTENDANCE_RETENTION_DAYS = 30;
 const OTP_TTL_MINUTES = Math.max(1, parseInt(process.env.ATTENDANCE_OTP_TTL_MINUTES || "10", 10));
@@ -416,6 +416,24 @@ exports.requestFallbackOtp = async (req, res, next) => {
     const now = Date.now();
     const nextAllowedSendAt = now + OTP_RESEND_COOLDOWN_SECONDS * 1000;
 
+    // Send email FIRST - only store OTP if email send succeeds
+    console.log(`[OTP] Attempting to send ${action} OTP to ${email} for user ${user._id}`);
+    try {
+      await sendAttendanceOtpEmail({
+        toEmail: email,
+        otp,
+        action,
+        memberName: user.name,
+        expiresInMinutes: OTP_TTL_MINUTES,
+      });
+      console.log(`[OTP] Email sent successfully for user ${user._id}`);
+    } catch (emailError) {
+      console.error(`[OTP] Email send failed for user ${user._id}:`, emailError.message);
+      // Don't store OTP if email failed - let error bubble up
+      throw emailError;
+    }
+
+    // Only store OTP if email was sent successfully
     otpStore.set(key, {
       otpHash: hashOtp(otp),
       email,
@@ -425,14 +443,6 @@ exports.requestFallbackOtp = async (req, res, next) => {
       sendCountInWindow: rateLimitState.sendCountInWindow + 1,
       rateLimitWindowStart: rateLimitState.rateLimitWindowStart,
       nextAllowedSendAt,
-    });
-
-    await sendAttendanceOtpEmail({
-      toEmail: email,
-      otp,
-      action,
-      memberName: user.name,
-      expiresInMinutes: OTP_TTL_MINUTES,
     });
 
     return res.json({
