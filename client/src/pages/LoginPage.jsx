@@ -42,7 +42,10 @@ export default function LoginPage() {
       );
       navigateAfterAuth(user);
     } catch (err) {
-      const errorMsg = err.response?.data?.error || err.message || "Login failed";
+      const status = err.response?.status;
+      const errorMsg = status === 504
+        ? "Server is taking too long to respond. Please retry in a few seconds."
+        : (err.response?.data?.error || err.message || "Login failed");
       setError(errorMsg);
     } finally {
       setLoading(false);

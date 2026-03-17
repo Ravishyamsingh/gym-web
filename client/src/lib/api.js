@@ -2,6 +2,9 @@ import axios from "axios";
 import { auth } from "./firebase";
 
 const apiOrigin = import.meta.env.VITE_API_URL?.trim();
+const fallbackApiOrigin = (import.meta.env.VITE_API_FALLBACK_URL?.trim() || "https://olympia-fitness.onrender.com")
+  .replace(/\/+$/, "")
+  .replace(/\/api$/i, "");
 const normalizedApiOrigin = apiOrigin
   ? apiOrigin.replace(/\/+$/, "").replace(/\/api$/i, "")
   : "";
@@ -20,6 +23,7 @@ const baseURL = (!isLocalHostRuntime && pointsToLocalhost)
 
 const api = axios.create({
   baseURL,
+  timeout: 20000,
 });
 
 const PUBLIC_AUTH_ROUTES = [
@@ -30,6 +34,15 @@ const PUBLIC_AUTH_ROUTES = [
 
 function isPublicAuthRoute(url = "") {
   return PUBLIC_AUTH_ROUTES.some((route) => url.startsWith(route));
+}
+
+function isAuthOrSessionRoute(url = "") {
+  return (
+    url.startsWith("/auth/") ||
+    url.startsWith("auth/") ||
+    url.startsWith("/users/me") ||
+    url.startsWith("users/me")
+  );
 }
 
 // Attach the Firebase ID-token OR JWT token to every outgoing request
@@ -77,7 +90,25 @@ api.interceptors.request.use(
 // Log API response errors for debugging
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
+    const status = error?.response?.status;
+    const requestUrl = String(error?.config?.url || "");
+    const canRetryViaDirectOrigin =
+      !isLocalHostRuntime &&
+      typeof window !== "undefined" &&
+      baseURL === "/api" &&
+      isAuthOrSessionRoute(requestUrl) &&
+      !error?.config?.__retriedViaDirectOrigin;
+
+    if (status === 504 && canRetryViaDirectOrigin) {
+      const retryConfig = {
+        ...error.config,
+        __retriedViaDirectOrigin: true,
+        baseURL: `${fallbackApiOrigin}/api`,
+      };
+      return api.request(retryConfig);
+    }
+
     if (error.response?.status === 500) {
       console.error("Server error 500 - API call failed:", {
         url: error.config?.url,

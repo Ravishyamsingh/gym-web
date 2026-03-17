@@ -821,8 +821,11 @@ export default function LandingPage() {
               &copy; {new Date().getFullYear()} Om Muruga Olympia Fitness. All rights reserved.
             </p>
             <div className="flex gap-6 text-xs text-white/30">
-              <a href="#" className="hover:text-blood transition">Privacy Policy</a>
-              <a href="#" className="hover:text-blood transition">Terms of Service</a>
+              <Link to="/privacy" className="hover:text-blood transition">Privacy Policy</Link>
+              <Link to="/terms" className="hover:text-blood transition">Terms and Conditions</Link>
+              <Link to="/shipping" className="hover:text-blood transition">Shipping Policy</Link>
+              <Link to="/contact" className="hover:text-blood transition">Contact Us</Link>
+              <Link to="/refund-policy" className="hover:text-blood transition">Cancellation and Refunds</Link>
             </div>
           </div>
         </div>

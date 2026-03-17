@@ -17,6 +17,11 @@ import AdminSettings from "./pages/admin/AdminSettings";
 import MembershipPage from "./pages/onboarding/MembershipPage";
 import PaymentPage from "./pages/onboarding/PaymentPage";
 import FaceRegistrationPage from "./pages/onboarding/FaceRegistrationPage";
+import TermsPage from "./pages/legal/TermsPage";
+import PrivacyPage from "./pages/legal/PrivacyPage";
+import ShippingPolicyPage from "./pages/legal/ShippingPolicyPage";
+import ContactPage from "./pages/legal/ContactPage";
+import RefundPolicyPage from "./pages/legal/RefundPolicyPage";
 
 // Layouts
 import AdminLayout from "./components/layout/AdminLayout";
@@ -75,6 +80,11 @@ export default function App() {
       <Routes location={location} key={location.pathname}>
         {/* Public */}
         <Route path="/" element={<LandingPage />} />
+        <Route path="/terms" element={<TermsPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/shipping" element={<ShippingPolicyPage />} />
+        <Route path="/contact" element={<ContactPage />} />
+        <Route path="/refund-policy" element={<RefundPolicyPage />} />
 
         {/* Guest-only (redirect if already logged in) */}
         <Route path="/login" element={<GuestRoute><LoginPage /></GuestRoute>} />
