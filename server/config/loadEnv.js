@@ -5,14 +5,15 @@ const dotenv = require("dotenv");
 const serverRoot = path.resolve(__dirname, "..");
 const productionEnvPath = path.join(serverRoot, ".env");
 const localEnvPath = path.join(serverRoot, ".env.local");
-const isProduction = process.env.NODE_ENV === "production";
 
-const selectedEnvPath = !isProduction && fs.existsSync(localEnvPath)
-  ? localEnvPath
-  : productionEnvPath;
+// Always load production env first
+dotenv.config({ path: productionEnvPath });
 
-dotenv.config({ path: selectedEnvPath });
+// Then load local env (overrides production)
+if (fs.existsSync(localEnvPath)) {
+  dotenv.config({ path: localEnvPath, override: true });
+}
 
 module.exports = {
-  selectedEnvPath,
+  loadedFrom: fs.existsSync(localEnvPath) ? localEnvPath : productionEnvPath,
 };
