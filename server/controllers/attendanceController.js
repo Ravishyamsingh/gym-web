@@ -5,6 +5,18 @@ const { sendAttendanceOtpEmail } = require("../utils/resendService");
 const ATTENDANCE_RETENTION_DAYS = 30;
 const OTP_TTL_MINUTES = Math.max(1, parseInt(process.env.ATTENDANCE_OTP_TTL_MINUTES || "10", 10));
 const OTP_MAX_ATTEMPTS = Math.max(1, parseInt(process.env.ATTENDANCE_OTP_MAX_ATTEMPTS || "5", 10));
+const OTP_RATE_LIMIT_WINDOW_MINUTES = Math.max(
+  1,
+  parseInt(process.env.ATTENDANCE_OTP_RATE_LIMIT_WINDOW_MINUTES || "5", 10)
+);
+const OTP_MAX_SENDS_PER_WINDOW = Math.max(
+  1,
+  parseInt(process.env.ATTENDANCE_OTP_MAX_SENDS_PER_WINDOW || "3", 10)
+);
+const OTP_RESEND_COOLDOWN_SECONDS = Math.max(
+  10,
+  parseInt(process.env.ATTENDANCE_OTP_RESEND_COOLDOWN_SECONDS || "30", 10)
+);
 const otpStore = new Map();
 
 function getRetentionStartDate() {
@@ -81,6 +93,64 @@ function validateOtpOrThrow({ userId, action, email, otp }) {
   }
 
   otpStore.delete(key);
+}
+
+function pruneExpiredOtpEntries() {
+  const now = Date.now();
+  for (const [key, item] of otpStore.entries()) {
+    if (!item) {
+      otpStore.delete(key);
+      continue;
+    }
+
+    const expiredByTtl = Number.isFinite(item.expiresAt) && now > item.expiresAt;
+    const expiredByWindow = Number.isFinite(item.rateLimitWindowStart)
+      && now - item.rateLimitWindowStart > OTP_RATE_LIMIT_WINDOW_MINUTES * 60 * 1000
+      && !Number.isFinite(item.expiresAt);
+
+    if (expiredByTtl || expiredByWindow) {
+      otpStore.delete(key);
+    }
+  }
+}
+
+function applyOtpRateLimitOrThrow(existingItem) {
+  const now = Date.now();
+  const defaultWindowStart = now;
+  const rateLimitWindowStart = Number.isFinite(existingItem?.rateLimitWindowStart)
+    ? existingItem.rateLimitWindowStart
+    : defaultWindowStart;
+
+  const windowAgeMs = now - rateLimitWindowStart;
+  const windowDurationMs = OTP_RATE_LIMIT_WINDOW_MINUTES * 60 * 1000;
+  const shouldResetWindow = windowAgeMs >= windowDurationMs;
+
+  const sendCountInWindow = shouldResetWindow ? 0 : (existingItem?.sendCountInWindow || 0);
+
+  if (sendCountInWindow >= OTP_MAX_SENDS_PER_WINDOW) {
+    const retryAfterSeconds = Math.max(1, Math.ceil((windowDurationMs - windowAgeMs) / 1000));
+    throw createHttpError(429, "Too many OTP requests. Please try again shortly.", {
+      error: "Too many OTP requests. Please try again shortly.",
+      retryAfterSeconds,
+    });
+  }
+
+  const nextAllowedSendAt = Number.isFinite(existingItem?.nextAllowedSendAt)
+    ? existingItem.nextAllowedSendAt
+    : 0;
+
+  if (nextAllowedSendAt > now) {
+    const retryAfterSeconds = Math.max(1, Math.ceil((nextAllowedSendAt - now) / 1000));
+    throw createHttpError(429, "Please wait before requesting another OTP.", {
+      error: "Please wait before requesting another OTP.",
+      retryAfterSeconds,
+    });
+  }
+
+  return {
+    rateLimitWindowStart: shouldResetWindow ? now : rateLimitWindowStart,
+    sendCountInWindow,
+  };
 }
 
 const LONG_SESSION_ALERT_MINUTES = Math.max(
@@ -311,6 +381,7 @@ exports.checkOut = async (req, res, next) => {
 // ─────────────────────────────────────────────
 exports.requestFallbackOtp = async (req, res, next) => {
   try {
+    pruneExpiredOtpEntries();
     const user = req.dbUser;
     if (!user) return res.status(404).json({ error: "User not found" });
 
@@ -337,14 +408,23 @@ exports.requestFallbackOtp = async (req, res, next) => {
       }
     }
 
-    const otp = generateSixDigitOtp();
     const key = getOtpStoreKey(user._id, action);
+    const existingItem = otpStore.get(key);
+    const rateLimitState = applyOtpRateLimitOrThrow(existingItem);
+
+    const otp = generateSixDigitOtp();
+    const now = Date.now();
+    const nextAllowedSendAt = now + OTP_RESEND_COOLDOWN_SECONDS * 1000;
+
     otpStore.set(key, {
       otpHash: hashOtp(otp),
       email,
       attempts: 0,
-      expiresAt: Date.now() + OTP_TTL_MINUTES * 60 * 1000,
+      expiresAt: now + OTP_TTL_MINUTES * 60 * 1000,
       action,
+      sendCountInWindow: rateLimitState.sendCountInWindow + 1,
+      rateLimitWindowStart: rateLimitState.rateLimitWindowStart,
+      nextAllowedSendAt,
     });
 
     await sendAttendanceOtpEmail({
@@ -352,6 +432,7 @@ exports.requestFallbackOtp = async (req, res, next) => {
       otp,
       action,
       memberName: user.name,
+      expiresInMinutes: OTP_TTL_MINUTES,
     });
 
     return res.json({
@@ -359,6 +440,7 @@ exports.requestFallbackOtp = async (req, res, next) => {
       otpSent: true,
       action,
       expiresInMinutes: OTP_TTL_MINUTES,
+      resendAvailableInSeconds: OTP_RESEND_COOLDOWN_SECONDS,
       ...(process.env.NODE_ENV !== "production" ? { testOtp: otp } : {}),
     });
   } catch (err) {
@@ -368,6 +450,9 @@ exports.requestFallbackOtp = async (req, res, next) => {
     next(err);
   }
 };
+
+// Alias endpoint for explicit resend actions from frontend
+exports.resendFallbackOtp = exports.requestFallbackOtp;
 
 // ─────────────────────────────────────────────
 // POST /api/attendance/verify-entry-otp

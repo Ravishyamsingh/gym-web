@@ -12,7 +12,8 @@
 ```bash
 cd server
 npm install
-# Copy .env.example → .env and fill in your values
+# Production config lives in .env
+# Local development config lives in .env.local
 npm run dev
 npm run start
 ```
@@ -21,6 +22,8 @@ npm run start
 ```bash
 cd client
 npm install
+# Production config lives in .env
+# Local development config lives in .env.local
 npm run dev
 npm run start
 ```

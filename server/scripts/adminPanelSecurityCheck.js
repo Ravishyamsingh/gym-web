@@ -1,11 +1,14 @@
-const path = require("path");
-require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
+require("../config/loadEnv");
 
 const mongoose = require("mongoose");
 const User = require("../models/User");
 
-const BASE_URL = process.env.TEST_BASE_URL || "http://localhost:5000/api";
+const BASE_URL = process.env.TEST_BASE_URL;
 const PASSWORD = "QaCheck123!";
+
+if (!BASE_URL) {
+  throw new Error("TEST_BASE_URL is required in environment configuration.");
+}
 
 function uniqueTag() {
   const t = Date.now().toString(36);

@@ -5,7 +5,7 @@
  *   1. Make sure MONGO_URI and ADMIN_EMAIL/ADMIN_EMAILS are set in .env
  *   2. Run:  npm run seed:admin
  */
-require("dotenv").config();
+require("../config/loadEnv");
 const mongoose = require("mongoose");
 const User = require("../models/User");
 

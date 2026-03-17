@@ -5,9 +5,18 @@ const apiOrigin = import.meta.env.VITE_API_URL?.trim();
 const normalizedApiOrigin = apiOrigin
   ? apiOrigin.replace(/\/+$/, "").replace(/\/api$/i, "")
   : "";
-const baseURL = normalizedApiOrigin
-  ? `${normalizedApiOrigin}/api`
-  : "/api"; // Dev uses Vite proxy.
+
+const isBrowser = typeof window !== "undefined";
+const isLocalHostRuntime = isBrowser
+  ? ["localhost", "127.0.0.1"].includes(window.location.hostname)
+  : false;
+const pointsToLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(normalizedApiOrigin);
+
+// On live domains, never allow localhost API origin.
+// Fallback to same-origin /api (Netlify proxy in production, Vite proxy in local).
+const baseURL = (!isLocalHostRuntime && pointsToLocalhost)
+  ? "/api"
+  : (normalizedApiOrigin ? `${normalizedApiOrigin}/api` : "/api");
 
 const api = axios.create({
   baseURL,

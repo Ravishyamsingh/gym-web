@@ -5,7 +5,7 @@ const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "onboarding@resend.de
 
 const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 
-async function sendAttendanceOtpEmail({ toEmail, otp, action, memberName }) {
+async function sendAttendanceOtpEmail({ toEmail, otp, action, memberName, expiresInMinutes = 5 }) {
   if (!resend) {
     const err = new Error("RESEND_API_KEY is not configured");
     err.statusCode = 500;
@@ -22,7 +22,7 @@ async function sendAttendanceOtpEmail({ toEmail, otp, action, memberName }) {
       <p>Hello ${safeMemberName},</p>
       <p>Your OTP for <strong>${actionLabel}</strong> verification is:</p>
       <div style="font-size: 32px; font-weight: bold; letter-spacing: 4px; color: #16a34a; margin: 16px 0;">${otp}</div>
-      <p>This OTP expires in 10 minutes and can be used only once.</p>
+      <p>This OTP expires in ${expiresInMinutes} minutes and can be used only once.</p>
       <p>If you did not request this, please contact the gym desk immediately.</p>
     </div>
   `;

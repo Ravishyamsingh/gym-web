@@ -27,6 +27,9 @@ export default function VerifyFace() {
   const [fallbackOtp, setFallbackOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [otpLoading, setOtpLoading] = useState(false);
+  const [otpError, setOtpError] = useState("");
+  const [otpExpiryMinutes, setOtpExpiryMinutes] = useState(5);
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   const action = searchParams.get("action") === "exit" ? "exit" : "entry";
   const isExitAction = action === "exit";
@@ -100,11 +103,22 @@ export default function VerifyFace() {
     setOtpSent(false);
     setFallbackOtp("");
     setOtpLoading(false);
+    setOtpError("");
+    setOtpExpiryMinutes(5);
+    setResendCooldown(0);
   };
 
   useEffect(() => {
     return () => stopCamera();
   }, []);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setResendCooldown((prev) => (prev <= 1 ? 0 : prev - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
 
   // ── Verify face (multi-sample for accuracy) ───────────────────────
   const handleVerify = async () => {
@@ -174,21 +188,32 @@ export default function VerifyFace() {
   const requestOtpFallback = async () => {
     const email = String(fallbackEmail || "").trim();
     if (!email) {
+      setOtpError("Please enter your registered email");
       setMessage("Please enter your registered email");
       return;
     }
 
     try {
       setOtpLoading(true);
+      setOtpError("");
       setMessage("Sending OTP to your email…");
-      await api.post("/attendance/request-fallback-otp", {
+      const endpoint = otpSent ? "/attendance/resend-fallback-otp" : "/attendance/request-fallback-otp";
+      const { data } = await api.post(endpoint, {
         email,
         action,
       });
       setOtpSent(true);
+      setOtpExpiryMinutes(data?.expiresInMinutes || 5);
+      setResendCooldown(data?.resendAvailableInSeconds || 30);
       setMessage("OTP sent. Check your inbox and enter the 6-digit code.");
     } catch (err) {
-      setMessage(err.response?.data?.error || "Failed to send OTP");
+      const serverMessage = err.response?.data?.error || "Failed to send OTP";
+      const retryAfterSeconds = err.response?.data?.retryAfterSeconds;
+      if (retryAfterSeconds) {
+        setResendCooldown(retryAfterSeconds);
+      }
+      setOtpError(serverMessage);
+      setMessage(serverMessage);
     } finally {
       setOtpLoading(false);
     }
@@ -199,12 +224,14 @@ export default function VerifyFace() {
     const otp = String(fallbackOtp || "").trim();
 
     if (!email || !otp) {
+      setOtpError("Email and OTP are required");
       setMessage("Email and OTP are required");
       return;
     }
 
     try {
       setOtpLoading(true);
+      setOtpError("");
       setMessage(isExitAction ? "Verifying OTP for exit…" : "Verifying OTP for entry…");
       const endpoint = isExitAction ? "/attendance/verify-exit-otp" : "/attendance/verify-entry-otp";
       const { data } = await api.post(endpoint, { email, otp });
@@ -219,8 +246,10 @@ export default function VerifyFace() {
           : `Entry verified via OTP! You can enter the gym now.`
       );
     } catch (err) {
+      const serverMessage = err.response?.data?.error || "OTP verification failed";
       setStatus("denied");
-      setMessage(err.response?.data?.error || "OTP verification failed");
+      setOtpError(serverMessage);
+      setMessage(serverMessage);
     } finally {
       setOtpLoading(false);
     }
@@ -349,6 +378,9 @@ export default function VerifyFace() {
         {status === "denied" && showEmailFallback && (
           <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-4 space-y-3 text-left">
             <p className="text-sm font-semibold text-yellow-300">Email OTP Fallback</p>
+            <p className="text-xs text-yellow-200/80">
+              Use OTP if camera/face verification fails. Code expires in {otpExpiryMinutes} minutes.
+            </p>
             <input
               type="email"
               value={fallbackEmail}
@@ -383,7 +415,19 @@ export default function VerifyFace() {
                 >
                   {otpLoading ? "Verifying OTP…" : isExitAction ? "Verify OTP & Exit" : "Verify OTP & Enter"}
                 </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={requestOtpFallback}
+                  disabled={otpLoading || resendCooldown > 0}
+                >
+                  {resendCooldown > 0 ? `Resend OTP in ${resendCooldown}s` : "Resend OTP"}
+                </Button>
               </>
+            )}
+
+            {otpError && (
+              <p className="text-xs font-medium text-blood">{otpError}</p>
             )}
           </div>
         )}

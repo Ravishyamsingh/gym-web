@@ -4,6 +4,7 @@ const {
 	checkIn,
 	checkOut,
 	requestFallbackOtp,
+	resendFallbackOtp,
 	verifyEntryOtp,
 	verifyExitOtp,
 	getCurrentSession,
@@ -28,6 +29,7 @@ router.get("/my", verifyToken, getMyAttendance);
 
 // User: email OTP fallback flow when face verification fails
 router.post("/request-fallback-otp", verifyToken, requestFallbackOtp);
+router.post("/resend-fallback-otp", verifyToken, resendFallbackOtp);
 router.post("/verify-entry-otp", verifyToken, verifyEntryOtp);
 router.post("/verify-exit-otp", verifyToken, verifyExitOtp);
 

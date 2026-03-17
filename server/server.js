@@ -1,5 +1,4 @@
-const path = require("path");
-require("dotenv").config({ path: path.join(__dirname, ".env") });
+require("./config/loadEnv");
 const express = require("express");
 const cors = require("cors");
 const connectDB = require("./config/db");
@@ -21,7 +20,40 @@ if (!process.env.JWT_SECRET) {
 const app = express();
 
 // ── Middleware ──────────────────────────────
-app.use(cors({ origin: process.env.CLIENT_URL || "http://localhost:5173", credentials: true }));
+if (!process.env.CLIENT_URL) {
+  console.error("❌ CLIENT_URL is required. Set it in server/.env.local for local or server/.env for production.");
+  process.exit(1);
+}
+
+const configuredOrigins = [
+  process.env.CLIENT_URL,
+  ...(process.env.CLIENT_URLS || "")
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean),
+];
+
+if (process.env.NODE_ENV !== "production") {
+  configuredOrigins.push("http://localhost:5173", "http://127.0.0.1:5173");
+}
+
+const allowedOrigins = new Set(configuredOrigins);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests without Origin (curl/Postman/server-to-server).
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.has(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`CORS blocked for origin: ${origin}`));
+    },
+    credentials: true,
+  })
+);
 
 // Request logging middleware
 app.use((req, res, next) => {

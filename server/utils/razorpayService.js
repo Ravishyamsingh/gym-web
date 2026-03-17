@@ -247,7 +247,10 @@ function getRazorpayCheckoutConfig({
   userEmail,
   userPhone,
 }) {
-  const clientOrigin = process.env.CLIENT_URL || "http://localhost:5173";
+  const clientOrigin = process.env.CLIENT_URL;
+  if (!clientOrigin) {
+    throw new Error("CLIENT_URL is required in environment configuration.");
+  }
   return {
     key_id: keyId,
     order_id: orderId,
