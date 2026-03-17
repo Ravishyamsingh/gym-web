@@ -19,6 +19,18 @@ if (!process.env.JWT_SECRET) {
 // ── Initialise app ─────────────────────────
 const app = express();
 
+function normalizeOrigin(input) {
+  const raw = String(input || "").trim();
+  if (!raw) return "";
+
+  try {
+    return new URL(raw).origin.toLowerCase();
+  } catch (_err) {
+    // Fallback for partially malformed values that still contain an origin.
+    return raw.replace(/\/+$/, "").toLowerCase();
+  }
+}
+
 // ── Middleware ──────────────────────────────
 if (!process.env.CLIENT_URL) {
   console.error("❌ CLIENT_URL is required. Set it in server/.env.local for local or server/.env for production.");
@@ -33,11 +45,20 @@ const configuredOrigins = [
     .filter(Boolean),
 ];
 
+// Safety defaults for this deployment so auth never blocks due to minor env drift.
+configuredOrigins.push("https://olympia-fitness.netlify.app", "https://www.olympia-fitness.netlify.app");
+
 if (process.env.NODE_ENV !== "production") {
   configuredOrigins.push("http://localhost:5173", "http://127.0.0.1:5173");
 }
 
-const allowedOrigins = new Set(configuredOrigins);
+const allowedOrigins = new Set(
+  configuredOrigins
+    .map((origin) => normalizeOrigin(origin))
+    .filter(Boolean)
+);
+
+console.log("✅ CORS allowed origins:", Array.from(allowedOrigins));
 
 app.use(
   cors({
@@ -45,13 +66,16 @@ app.use(
       // Allow requests without Origin (curl/Postman/server-to-server).
       if (!origin) return callback(null, true);
 
-      if (allowedOrigins.has(origin)) {
+      const normalizedOrigin = normalizeOrigin(origin);
+
+      if (allowedOrigins.has(normalizedOrigin)) {
         return callback(null, true);
       }
 
       return callback(new Error(`CORS blocked for origin: ${origin}`));
     },
     credentials: true,
+    optionsSuccessStatus: 204,
   })
 );
 

@@ -5,6 +5,7 @@ const apiOrigin = import.meta.env.VITE_API_URL?.trim();
 const fallbackApiOrigin = (import.meta.env.VITE_API_FALLBACK_URL?.trim() || "https://olympia-fitness.onrender.com")
   .replace(/\/+$/, "")
   .replace(/\/api$/i, "");
+const enableDirectApiFallback = String(import.meta.env.VITE_ENABLE_DIRECT_API_FALLBACK || "false").toLowerCase() === "true";
 const normalizedApiOrigin = apiOrigin
   ? apiOrigin.replace(/\/+$/, "").replace(/\/api$/i, "")
   : "";
@@ -43,6 +44,10 @@ function isAuthOrSessionRoute(url = "") {
     url.startsWith("/users/me") ||
     url.startsWith("users/me")
   );
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 // Attach the Firebase ID-token OR JWT token to every outgoing request
@@ -93,14 +98,35 @@ api.interceptors.response.use(
   async (error) => {
     const status = error?.response?.status;
     const requestUrl = String(error?.config?.url || "");
-    const canRetryViaDirectOrigin =
+    const canRetryViaProxy =
       !isLocalHostRuntime &&
       typeof window !== "undefined" &&
       baseURL === "/api" &&
       isAuthOrSessionRoute(requestUrl) &&
+      !error?.config?.__retriedViaProxy;
+
+    // First retry same-origin through Netlify/Vite proxy to avoid CORS issues.
+    if (status === 504 && canRetryViaProxy) {
+      await delay(1200);
+      const retryConfig = {
+        ...error.config,
+        __retriedViaProxy: true,
+        baseURL: "/api",
+      };
+      return api.request(retryConfig);
+    }
+
+    const canRetryViaDirectOrigin =
+      enableDirectApiFallback &&
+      status === 504 &&
+      !isLocalHostRuntime &&
+      typeof window !== "undefined" &&
+      baseURL === "/api" &&
+      isAuthOrSessionRoute(requestUrl) &&
+      error?.config?.__retriedViaProxy &&
       !error?.config?.__retriedViaDirectOrigin;
 
-    if (status === 504 && canRetryViaDirectOrigin) {
+    if (canRetryViaDirectOrigin) {
       const retryConfig = {
         ...error.config,
         __retriedViaDirectOrigin: true,
