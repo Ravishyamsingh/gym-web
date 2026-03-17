@@ -94,6 +94,12 @@ const userSchema = new mongoose.Schema(
       enum: ["email", "password", "google"],
       default: "email",
     },
+    // Reserved account marker for QA/dev automation.
+    isTestAccount: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
   },
   { timestamps: true }
 );

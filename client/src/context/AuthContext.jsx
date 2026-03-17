@@ -42,8 +42,22 @@ export function AuthProvider({ children }) {
           setProfileComplete(false);
         }
       } else {
-        setDbUser(null);
-        setProfileComplete(false);
+        // Password/JWT sessions have no Firebase user; restore from JWT when available.
+        const jwtToken = localStorage.getItem("jwtToken");
+        if (jwtToken) {
+          try {
+            const { data } = await api.get("/users/me");
+            setDbUser(data.user);
+            setProfileComplete(checkOnboardingComplete(data.user));
+          } catch {
+            localStorage.removeItem("jwtToken");
+            setDbUser(null);
+            setProfileComplete(false);
+          }
+        } else {
+          setDbUser(null);
+          setProfileComplete(false);
+        }
       }
       setLoading(false);
     });

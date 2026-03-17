@@ -81,8 +81,8 @@ exports.handlePaymentWebhook = async (req, res, next) => {
 
     console.log(`📍 Webhook received: ${event}`);
 
-    // Only process payment.authorized events
-    if (event !== "payment.authorized") {
+    // Process only payment lifecycle events we recognize.
+    if (!["payment.authorized", "payment.captured"].includes(event)) {
       console.log(`⏭️  Ignoring event: ${event}`);
       // Still return 200 to acknowledge receipt
       return res.json({ status: "acknowledged", event });
@@ -108,9 +108,13 @@ exports.handlePaymentWebhook = async (req, res, next) => {
     // ─────────────────────────────────────────────────────────────
     if (!isPaymentCaptured(paymentData)) {
       console.warn(
-        `⚠️  Payment status is ${paymentData.status}, expected "captured"`
+        `⚠️  Payment not captured yet for order ${orderId}. Status: ${paymentData.status}`
       );
-      // Even if not captured, we process it (admin can manually refund)
+      return res.json({
+        status: "acknowledged",
+        note: "Payment not captured yet",
+        paymentStatus: paymentData.status,
+      });
     }
 
     // ─────────────────────────────────────────────────────────────
