@@ -68,7 +68,7 @@ const benefits = [
   { icon: Users, title: "Community", desc: "Join a supportive community of fitness enthusiasts." },
 ];
 
-const MONTHLY_FEE = 600;
+const MONTHLY_FEE = 1; // Testing - change back to 600 after testing
 const formatInr = (amount) => `₹${amount.toLocaleString("en-IN")}`;
 
 const plans = [
