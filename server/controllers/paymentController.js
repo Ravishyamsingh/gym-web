@@ -3,7 +3,9 @@ const User = require("../models/User");
 const {
   createRazorpayOrder,
   getPlanPrice,
+  calculatePaymentAmount,
   getRazorpayCheckoutConfig,
+  REGISTRATION_FEE,
 } = require("../utils/razorpayService");
 
 // ─────────────────────────────────────────────
@@ -202,12 +204,23 @@ exports.createOrder = async (req, res, next) => {
     }
 
     // ─────────────────────────────────────────────────────────────
-    // Get plan price
+    // Calculate payment amount (with registration fee for first-time users)
     // ─────────────────────────────────────────────────────────────
     let amount;
     let duration;
+    let includesRegistrationFee;
+    let registrationFeeAmount;
+    let membershipFeeAmount;
+    
     try {
-      amount = getPlanPrice(planId);
+      const isFirstTimeUser = !user.registrationFeePaid;
+      const paymentDetails = calculatePaymentAmount(planId, isFirstTimeUser);
+      
+      amount = paymentDetails.totalAmount;
+      membershipFeeAmount = paymentDetails.planAmount;
+      registrationFeeAmount = paymentDetails.registrationFeeAmount;
+      includesRegistrationFee = paymentDetails.includesRegistrationFee;
+      
       // Map planId to duration string
       const durationMap = {
         "1month": "1 Month",
@@ -261,6 +274,9 @@ exports.createOrder = async (req, res, next) => {
       razorpayOrderId: razorpayOrder.id,
       paymentProcessor: "razorpay",
       webhookVerified: false,
+      includesRegistrationFee,
+      registrationFeeAmount: registrationFeeAmount / 100, // Convert to rupees
+      membershipFeeAmount: membershipFeeAmount / 100, // Convert to rupees
     });
 
     console.log(`📋 Payment record created: ${payment._id}`);
@@ -289,7 +305,12 @@ exports.createOrder = async (req, res, next) => {
       duration,
       expiryDate: expiryDate.toISOString(),
       checkoutConfig,
-      message: "Order created. Proceed to payment.",
+      includesRegistrationFee,
+      registrationFeeAmount: registrationFeeAmount / 100,
+      membershipFeeAmount: membershipFeeAmount / 100,
+      message: includesRegistrationFee 
+        ? "First-time payment includes ₹800 registration fee + membership plan amount"
+        : "Order created. Proceed to payment.",
     });
   } catch (err) {
     console.error("❌ Error creating order:", err.message);

@@ -52,6 +52,18 @@ export default function MembershipPage() {
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [showCheckout, setShowCheckout] = useState(false);
 
+  const REGISTRATION_FEE = 800; // First-time registration fee
+  
+  // Helper function to get combined price for first-time users
+  const getDisplayPrice = () => {
+    if (!dbUser?.registrationFeePaid) {
+      return selectedPlan ? selectedPlan.price + REGISTRATION_FEE : 0;
+    }
+    return selectedPlan ? selectedPlan.price : 0;
+  };
+  
+  const isFirstTimeUser = dbUser && !dbUser.registrationFeePaid;
+
   // If user already has active payment, redirect to dashboard
   useEffect(() => {
     if (dbUser?.paymentStatus === "active") {
@@ -125,9 +137,14 @@ export default function MembershipPage() {
                         {plan.duration}
                       </h2>
                       <span className="text-2xl font-bold text-blood">
-                        ₹{plan.price.toLocaleString("en-IN")}
+                        ₹{(isFirstTimeUser ? plan.price + REGISTRATION_FEE : plan.price).toLocaleString("en-IN")}
                       </span>
                     </div>
+                    {isFirstTimeUser && (
+                      <p className="text-xs text-white/50 mb-2">
+                        (₹{plan.price.toLocaleString("en-IN")} plan + ₹800 registration)
+                      </p>
+                    )}
                     <p className="text-sm text-white/50 mb-3">
                       {plan.description}
                     </p>
@@ -181,6 +198,29 @@ export default function MembershipPage() {
 
             {/* Checkout Component */}
             <div className="max-w-md mx-auto">
+              {/* Price Breakdown */}
+              {isFirstTimeUser && (
+                <div className="bg-blood/10 border border-blood/30 rounded-lg p-4 mb-6">
+                  <h3 className="text-sm font-semibold text-white mb-3">
+                    Payment Breakdown:
+                  </h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between text-white/70">
+                      <span>Membership ({selectedPlan.duration})</span>
+                      <span>₹{selectedPlan.price.toLocaleString("en-IN")}</span>
+                    </div>
+                    <div className="flex justify-between text-white/70">
+                      <span>Registration Fee</span>
+                      <span>₹800</span>
+                    </div>
+                    <div className="border-t border-white/20 pt-2 mt-2 flex justify-between font-bold text-white">
+                      <span>Total Amount</span>
+                      <span>₹{(selectedPlan.price + REGISTRATION_FEE).toLocaleString("en-IN")}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               <RazorpayCheckout
                 planId={selectedPlan.id}
                 planName={selectedPlan.duration}

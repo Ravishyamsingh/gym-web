@@ -100,6 +100,15 @@ const userSchema = new mongoose.Schema(
       default: false,
       index: true,
     },
+    // Registration Fee Tracking
+    registrationFeePaid: {
+      type: Boolean,
+      default: false,
+    },
+    registrationFeePaymentDate: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true }
 );

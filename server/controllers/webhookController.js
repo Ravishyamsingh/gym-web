@@ -193,6 +193,13 @@ exports.handlePaymentWebhook = async (req, res, next) => {
     user.membershipPlan = payment.planId;
     user.membershipStartDate = new Date();
     user.membershipExpiry = payment.expiryDate;
+    
+    // Mark registration fee as paid if this payment included it
+    if (payment.includesRegistrationFee && !user.registrationFeePaid) {
+      user.registrationFeePaid = true;
+      user.registrationFeePaymentDate = new Date();
+      console.log(`✅ Registration fee marked as paid for user: ${user._id}`);
+    }
 
     await user.save();
     console.log(

@@ -15,6 +15,7 @@ import {
   MapPin,
   Phone,
   Mail,
+  MessageCircle,
 } from "lucide-react";
 
 
@@ -264,6 +265,16 @@ export default function LandingPage() {
           <a href="#programs" className="nav-link">Programs</a>
         </div>
         <div className="flex items-center gap-3">
+          {/* WhatsApp Contact Button */}
+          <a
+            href="https://wa.me/918925148138?text=Hi%20Om%20Muruga%20Olympia%20Fitness,%20I%20need%20more%20details%20about%20the%20gym."
+            target="_blank"
+            rel="noopener noreferrer"
+            className="p-2 rounded-lg bg-white/5 hover:bg-emerald-500/20 transition-colors duration-300 group"
+            title="Chat on WhatsApp"
+          >
+            <MessageCircle className="w-5 h-5 text-white/70 group-hover:text-emerald-400 transition-colors" />
+          </a>
           <Link to="/login">
             <Button variant="ghost" size="sm">Log In</Button>
           </Link>
@@ -639,6 +650,42 @@ export default function LandingPage() {
               </motion.div>
             ))}
           </motion.div>
+
+          {/* Registration Fee Notice */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={revealViewport}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="mt-12 max-w-2xl mx-auto bg-gradient-to-r from-blood/10 to-blood/5 border border-blood/30 rounded-xl p-6"
+          >
+            <p className="text-center text-white/80 text-sm sm:text-base">
+              <span className="font-semibold text-blood">📝 Note:</span> First-time members are required to pay a one-time registration fee of <span className="font-bold text-blood">₹800</span> along with their selected membership plan. This fee is applicable only once and will not be charged during membership renewals.
+            </p>
+          </motion.div>
+
+          {/* WhatsApp Contact Note */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={revealViewport}
+            transition={{ duration: 0.5, delay: 0.3 }}
+            className="mt-4 max-w-2xl mx-auto bg-gradient-to-r from-emerald-500/10 to-emerald-400/5 border border-emerald-500/30 rounded-xl p-4 flex items-start gap-3"
+          >
+            <MessageCircle className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
+            <p className="text-center text-white/80 text-sm sm:text-base flex-1">
+              <span className="font-semibold text-emerald-400">💬 Need More Details?</span> Connect with us on{" "}
+              <a
+                href="https://wa.me/918925148138?text=Hi%20Om%20Muruga%20Olympia%20Fitness,%20I%20need%20more%20details%20about%20the%20gym."
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-emerald-400 hover:text-emerald-300 font-semibold underline transition"
+              >
+                WhatsApp
+              </a>{" "}
+              for personalized guidance on membership plans, facility tours, and gym information.
+            </p>
+          </motion.div>
         </div>
       </section>
 
@@ -810,6 +857,17 @@ export default function LandingPage() {
               <h4 className="font-bold text-light mb-4">Contact</h4>
               <ul className="space-y-2 text-sm text-white/50">
                 <li className="flex items-center gap-2"><Phone size={14} className="text-blood" /> +91 8925148138</li>
+                <li className="flex items-center gap-2">
+                  <MessageCircle size={14} className="text-emerald-400" />
+                  <a
+                    href="https://wa.me/918925148138?text=Hi%20Om%20Muruga%20Olympia%20Fitness,%20I%20need%20more%20details%20about%20the%20gym."
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-emerald-400 transition"
+                  >
+                    Chat on WhatsApp
+                  </a>
+                </li>
                 <li className="flex items-center gap-2"><Mail size={14} className="text-blood" /> massmanikanta70@gmail.com</li>
                 <li className="flex items-center gap-2"><MapPin size={14} className="text-blood" /> Vatrap Road, near Petrol Bunk Krishnan Kovil, TN</li>
               </ul>

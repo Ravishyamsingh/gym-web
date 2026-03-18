@@ -25,6 +25,7 @@ const razorpay = new Razorpay({
 // ─────────────────────────────────────────────────────────────────
 // Plan Prices (in paise — multiply INR by 100)
 // ─────────────────────────────────────────────────────────────────
+const REGISTRATION_FEE = 80000; // ₹800 for first-time users only
 const PLAN_PRICES = {
   "1month": 100, // ₹1 (Testing - change back to 60000 for ₹600 after testing)
   "6months": 300000, // ₹3000
@@ -43,6 +44,26 @@ function getPlanPrice(planId) {
     throw new Error(`Invalid plan: ${planId}`);
   }
   return price;
+}
+
+/**
+ * Calculate total payment amount for a user
+ * If user hasn't paid registration fee, add ₹800 to plan price
+ * @param {string} planId - Plan identifier
+ * @param {boolean} isFirstTimeUser - Whether user has paid registration fee
+ * @returns {Object} { totalAmount, planAmount, registrationFeeAmount, includesRegistrationFee }
+ */
+function calculatePaymentAmount(planId, isFirstTimeUser) {
+  const planAmount = getPlanPrice(planId);
+  const registrationFeeAmount = isFirstTimeUser ? REGISTRATION_FEE : 0;
+  const totalAmount = planAmount + registrationFeeAmount;
+
+  return {
+    totalAmount,
+    planAmount,
+    registrationFeeAmount,
+    includesRegistrationFee: isFirstTimeUser,
+  };
 }
 
 /**
@@ -342,6 +363,7 @@ function extractPaymentInfo(payment) {
 module.exports = {
   razorpay,
   getPlanPrice,
+  calculatePaymentAmount,
   createRazorpayOrder,
   verifyPaymentSignature,
   verifyWebhookSignature,
@@ -351,4 +373,5 @@ module.exports = {
   isPaymentCaptured,
   extractPaymentInfo,
   PLAN_PRICES,
+  REGISTRATION_FEE,
 };

@@ -89,6 +89,19 @@ const paymentSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    // Registration Fee Tracking
+    includesRegistrationFee: {
+      type: Boolean,
+      default: false,
+    },
+    registrationFeeAmount: {
+      type: Number,
+      default: 0,
+    },
+    membershipFeeAmount: {
+      type: Number,
+      default: 0,
+    },
   },
   { timestamps: true }
 );
