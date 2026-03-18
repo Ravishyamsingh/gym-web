@@ -186,4 +186,25 @@ router.get("/verify-email", async (req, res) => {
   }
 });
 
+// GET /api/test/config - Check if SMTP credentials are configured
+router.get("/config", (req, res) => {
+  const smtpEmail = process.env.SMTP_EMAIL || "";
+  const smtpPassword = process.env.SMTP_PASSWORD || "";
+  
+  res.json({
+    environment: process.env.NODE_ENV || "development",
+    smtp: {
+      configured: !!(smtpEmail && smtpPassword),
+      email: smtpEmail ? "✅ SET" : "❌ MISSING",
+      password: smtpPassword ? "✅ SET" : "❌ MISSING",
+      host: process.env.SMTP_HOST || "smtp.gmail.com",
+      port: process.env.SMTP_PORT || "587",
+    },
+    warnings: [
+      !smtpEmail && "⚠️ SMTP_EMAIL is not set",
+      !smtpPassword && "⚠️ SMTP_PASSWORD is not set - THIS IS WHY EMAILS AREN'T SENDING",
+    ].filter(Boolean),
+  });
+});
+
 module.exports = router;
