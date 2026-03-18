@@ -47,6 +47,13 @@ function initializeTransporter(forceReset = false) {
       user: SMTP_EMAIL,
       pass: SMTP_PASSWORD,
     },
+    // Gmail/most SMTP providers require STARTTLS on 587
+    requireTLS: !SMTP_SECURE,
+    tls: {
+      // Avoid common TLS handshake issues in some hosting environments
+      minVersion: "TLSv1.2",
+      rejectUnauthorized: true,
+    },
     connectionTimeout: 30000,
     socketTimeout: 30000,
     greetingTimeout: 10000,

@@ -511,7 +511,20 @@ exports.requestFallbackOtp = async (req, res, next) => {
     if (queueAdded) {
       console.log(`[OTP] ✅ Email queued for reliable delivery`);
     } else {
-      console.error(`[OTP] ⚠️  Email queue is full - email may not be sent`);
+      console.error(`[OTP] ⚠️  Email queue is full - trying direct send fallback`);
+      try {
+        await sendAttendanceOtpEmail({
+          toEmail: email,
+          otp,
+          action,
+          memberName: user.name,
+          userId: user._id.toString(),
+          expiresInMinutes: OTP_TTL_MINUTES,
+        });
+        console.log(`[OTP] ✅ Direct send fallback succeeded`);
+      } catch (e) {
+        console.error(`[OTP] ❌ Direct send fallback failed:`, e.message);
+      }
     }
 
     // Respond immediately - don't wait for email
