@@ -86,21 +86,41 @@ async function sendAttendanceOtpEmail({
   userId,
   expiresInMinutes = 5,
 }) {
-  const maxRetries = 2; // Reduced from 3 to 2
-  const MAX_TOTAL_TIME = 20000; // 20 second hard timeout for entire operation
+  // Validate inputs
+  if (!toEmail || !otp || !action) {
+    const err = new Error("Missing required parameters: toEmail, otp, action");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(toEmail)) {
+    const err = new Error(`Invalid email address: ${toEmail}`);
+    err.statusCode = 400;
+    throw err;
+  }
+
+  if (!/^\d{6}$/.test(String(otp))) {
+    const err = new Error(`Invalid OTP format: ${otp}`);
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const maxRetries = 2;
+  const MAX_TOTAL_TIME = 25000; // 25 second hard timeout
   let lastError = null;
   const startTime = Date.now();
 
-  console.log(`\n${'='.repeat(60)}`);
+  console.log(`\n${'='.repeat(70)}`);
   console.log(`[EMAIL] 📧 OTP EMAIL REQUEST STARTED`);
-  console.log(`${'='.repeat(60)}`);
+  console.log(`${'='.repeat(70)}`);
   console.log(`[EMAIL] Timestamp: ${new Date().toISOString()}`);
   console.log(`[EMAIL] To Email: ${toEmail}`);
   console.log(`[EMAIL] OTP: ${otp}`);
   console.log(`[EMAIL] Action: ${action}`);
-  console.log(`[EMAIL] User ID: ${userId}`);
-  console.log(`[EMAIL] Member Name: ${memberName}`);
-  console.log(`${'='.repeat(60)}\n`);
+  console.log(`[EMAIL] User ID: ${userId || "N/A"}`);
+  console.log(`[EMAIL] Member Name: ${memberName || "N/A"}`);
+  console.log(`[EMAIL] Expires In: ${expiresInMinutes} minutes`);
+  console.log(`${'='.repeat(70)}\n`);
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     // Check if we've exceeded total time budget

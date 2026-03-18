@@ -9,6 +9,7 @@ import {
   extractBestDescriptor,
   normalizeDescriptor,
   compareDescriptors,
+  isValidFaceDetection,
 } from "@/lib/faceApi";
 import api from "@/lib/api";
 import { ScanFace, CheckCircle2, XCircle } from "lucide-react";

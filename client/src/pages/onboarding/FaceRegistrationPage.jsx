@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/Button";
 import { motion } from "framer-motion";
-import { loadFaceModels, extractBestDescriptor, descriptorToArray } from "@/lib/faceApi";
+import { loadFaceModels, extractBestDescriptor, descriptorToArray, isValidFaceDetection } from "@/lib/faceApi";
 import api from "@/lib/api";
 import { ScanFace } from "lucide-react";
 

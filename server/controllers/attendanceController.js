@@ -3,6 +3,50 @@ const crypto = require("crypto");
 const { sendAttendanceOtpEmail } = require("../utils/emailService");
 const EmailQueueManager = require("../utils/emailQueueManager");
 
+/**
+ * Stricter face matching threshold (0.45 instead of 0.6)
+ * Lower values = stricter matching
+ */
+const FACE_MATCH_THRESHOLD = 0.45;
+
+/**
+ * Calculate Euclidean distance between two 128-dimensional face descriptors
+ * @param {number[]} descriptor1 - First face descriptor (128 values)
+ * @param {number[]} descriptor2 - Second face descriptor (128 values)
+ * @returns {number} Euclidean distance
+ */
+function calculateFaceDistance(descriptor1, descriptor2) {
+  if (!descriptor1 || !descriptor2 || descriptor1.length !== 128 || descriptor2.length !== 128) {
+    console.error("Invalid descriptors for distance calculation");
+    return Infinity;
+  }
+  
+  let sum = 0;
+  for (let i = 0; i < 128; i++) {
+    const diff = (descriptor1[i] || 0) - (descriptor2[i] || 0);
+    sum += diff * diff;
+  }
+  return Math.sqrt(sum);
+}
+
+/**
+ * Validate face match with strict threshold
+ * @param {number[]} capturedDescriptor - Face descriptor from verification
+ * @param {number[]} storedDescriptor - Stored face descriptor from registration
+ * @returns {Object} { match: boolean, distance: number, confidence: number }
+ */
+function validateFaceMatch(capturedDescriptor, storedDescriptor) {
+  const distance = calculateFaceDistance(capturedDescriptor, storedDescriptor);
+  const match = distance < FACE_MATCH_THRESHOLD;
+  
+  // Calculate confidence score (0-100)
+  const confidence = Math.max(0, Math.min(100, 100 - (distance / FACE_MATCH_THRESHOLD) * 100));
+  
+  console.log(`[Face Validation] Distance: ${distance.toFixed(4)}, Threshold: ${FACE_MATCH_THRESHOLD}, Match: ${match}, Confidence: ${confidence.toFixed(1)}%`);
+  
+  return { match, distance, confidence };
+}
+
 const ATTENDANCE_RETENTION_DAYS = 30;
 const OTP_TTL_MINUTES = Math.max(1, parseInt(process.env.ATTENDANCE_OTP_TTL_MINUTES || "10", 10));
 const OTP_MAX_ATTEMPTS = Math.max(1, parseInt(process.env.ATTENDANCE_OTP_MAX_ATTEMPTS || "5", 10));
@@ -435,7 +479,7 @@ exports.requestFallbackOtp = async (req, res, next) => {
     const now = Date.now();
     const nextAllowedSendAt = now + OTP_RESEND_COOLDOWN_SECONDS * 1000;
 
-    console.log(`[OTP] Generated OTP: ${otp}`);
+    console.log(`[OTP] ✅ Generated OTP: ${otp}`);
 
     // Store OTP FIRST - don't wait for email
     otpStore.set(key, {
@@ -455,23 +499,33 @@ exports.requestFallbackOtp = async (req, res, next) => {
 
     // Add email to queue for reliable delivery with retries (non-blocking)
     console.log(`[OTP] Adding email to queue for ${email}`);
-    EmailQueueManager.addToQueue({
+    const queueAdded = EmailQueueManager.addToQueue({
       toEmail: email,
       otp,
       action,
       memberName: user.name,
+      userId: user._id.toString(),
+      expiresInMinutes: OTP_TTL_MINUTES,
     });
-    console.log(`[OTP] Email queued for reliable delivery`);
+
+    if (queueAdded) {
+      console.log(`[OTP] ✅ Email queued for reliable delivery`);
+    } else {
+      console.error(`[OTP] ⚠️  Email queue is full - email may not be sent`);
+    }
 
     // Respond immediately - don't wait for email
     console.log(`[OTP] 📤 Sending success response to client immediately`);
+    console.log(`[OTP] OTP: ${otp} (for testing/debugging)`);
+    
     return res.json({
       message: `OTP sent to ${email}`,
       otpSent: true,
       action,
       expiresInMinutes: OTP_TTL_MINUTES,
       resendAvailableInSeconds: OTP_RESEND_COOLDOWN_SECONDS,
-      ...(process.env.NODE_ENV !== "production" ? { testOtp: otp } : {}),
+      // Always include OTP in development/testing
+      ...(process.env.NODE_ENV !== "production" && { testOtp: otp }),
     });
   } catch (err) {
     if (err.statusCode) {
