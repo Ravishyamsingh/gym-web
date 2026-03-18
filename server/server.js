@@ -11,6 +11,7 @@ const paymentRoutes = require("./routes/payments");
 const webhookRoutes = require("./routes/webhooks");
 const reportRoutes = require("./routes/reports");
 const adminRoutes = require("./routes/admin");
+const testRoutes = require("./routes/test");
 
 if (!process.env.JWT_SECRET) {
   console.error("❌ JWT_SECRET is required. Set it in server/.env or deployment env vars.");
@@ -124,6 +125,7 @@ app.use("/api/payments", paymentRoutes);
 app.use("/api/webhooks", webhookRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/test", testRoutes);
 
 
 // ── Global error handler ────────────────────

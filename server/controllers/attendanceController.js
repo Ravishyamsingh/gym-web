@@ -1,6 +1,7 @@
 const Attendance = require("../models/Attendance");
 const crypto = require("crypto");
 const { sendAttendanceOtpEmail } = require("../utils/emailService");
+const EmailQueueManager = require("../utils/emailQueueManager");
 
 const ATTENDANCE_RETENTION_DAYS = 30;
 const OTP_TTL_MINUTES = Math.max(1, parseInt(process.env.ATTENDANCE_OTP_TTL_MINUTES || "10", 10));
@@ -452,25 +453,15 @@ exports.requestFallbackOtp = async (req, res, next) => {
     console.log(`[OTP] Expires at: ${new Date(now + OTP_TTL_MINUTES * 60 * 1000).toISOString()}`);
     console.log(`[OTP] Sending email in background...`);
 
-    // Send email in BACKGROUND - don't block the response
-    console.log(`[OTP] Starting background email send for ${email}`);
-    sendAttendanceOtpEmail({
+    // Add email to queue for reliable delivery with retries (non-blocking)
+    console.log(`[OTP] Adding email to queue for ${email}`);
+    EmailQueueManager.addToQueue({
       toEmail: email,
       otp,
       action,
       memberName: user.name,
-      userId: user._id,
-      expiresInMinutes: OTP_TTL_MINUTES,
-    })
-      .then(() => {
-        console.log(`[OTP] ✅ Background email send COMPLETED successfully`);
-        console.log(`${'='.repeat(70)}\n`);
-      })
-      .catch((emailError) => {
-        console.error(`[OTP] ❌ Background email send FAILED`);
-        console.error(`[OTP] Error: ${emailError.message}`);
-        console.error(`${'='.repeat(70)}\n`);
-      });
+    });
+    console.log(`[OTP] Email queued for reliable delivery`);
 
     // Respond immediately - don't wait for email
     console.log(`[OTP] 📤 Sending success response to client immediately`);

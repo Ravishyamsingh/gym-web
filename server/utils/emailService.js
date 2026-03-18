@@ -1,4 +1,5 @@
 const nodemailer = require("nodemailer");
+const EmailQueueManager = require("./emailQueueManager");
 
 /**
  * Email Service using Nodemailer with SMTP
