@@ -15,8 +15,21 @@ const SMTP_PASSWORD = (process.env.SMTP_PASSWORD || "").replace(/\s/g, "");
 
 // Create transporter instance
 let transporter = null;
+let lastTransporterReset = null;
+const TRANSPORTER_RESET_INTERVAL = 60 * 60 * 1000; // Reset transporter every hour
 
-function initializeTransporter() {
+function initializeTransporter(forceReset = false) {
+  const now = Date.now();
+  
+  // Reset transporter every hour or if forced
+  if (forceReset || !transporter || (lastTransporterReset && now - lastTransporterReset > TRANSPORTER_RESET_INTERVAL)) {
+    if (transporter) {
+      console.log(`[EMAIL] Closing existing transporter connection`);
+      transporter.close();
+    }
+    transporter = null;
+  }
+
   if (transporter) return transporter;
 
   if (!SMTP_EMAIL || !SMTP_PASSWORD) {
@@ -35,14 +48,17 @@ function initializeTransporter() {
     },
     connectionTimeout: 30000,
     socketTimeout: 30000,
+    greetingTimeout: 10000,
     pool: {
       maxConnections: 5,
       maxMessages: 100,
       rateDelta: 4000,
       rateLimit: 14,
+      idleTimeout: 30000,
     },
   });
 
+  lastTransporterReset = now;
   console.log(`[EMAIL] Nodemailer transporter initialized`);
   console.log(`[EMAIL] SMTP Host: ${SMTP_HOST}:${SMTP_PORT} (secure: ${SMTP_SECURE})`);
   console.log(`[EMAIL] From Email: ${SMTP_EMAIL}`);
@@ -51,7 +67,7 @@ function initializeTransporter() {
 }
 
 /**
- * Send OTP email for gym attendance verification
+ * Send OTP email for gym attendance verification with retry logic
  * @param {Object} params - Email parameters
  * @param {string} params.toEmail - Recipient email address
  * @param {string} params.otp - 6-digit OTP code
@@ -67,29 +83,33 @@ async function sendAttendanceOtpEmail({
   memberName,
   expiresInMinutes = 5,
 }) {
-  try {
-    const trans = initializeTransporter();
+  const maxRetries = 3;
+  let lastError = null;
 
-    const actionLabel = action === "exit" ? "Exit" : "Entry";
-    const safeMemberName = memberName || "Member";
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const trans = initializeTransporter();
 
-    const subject = `${actionLabel} OTP - Gym Attendance Verification`;
-    const html = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #111827;">Gym Attendance OTP Verification</h2>
-        <p>Hello ${safeMemberName},</p>
-        <p>Your OTP for <strong>${actionLabel}</strong> verification is:</p>
-        <div style="font-size: 32px; font-weight: bold; letter-spacing: 4px; color: #16a34a; margin: 16px 0;">${otp}</div>
-        <p>This OTP expires in ${expiresInMinutes} minutes and can be used only once.</p>
-        <p>If you did not request this, please contact the gym desk immediately.</p>
-        <hr style="margin: 20px 0; border: none; border-top: 1px solid #e5e7eb;" />
-        <p style="color: #6b7280; font-size: 12px;">
-          Olympia Fitness | Secure Email Verification
-        </p>
-      </div>
-    `;
+      const actionLabel = action === "exit" ? "Exit" : "Entry";
+      const safeMemberName = memberName || "Member";
 
-    const plainText = `
+      const subject = `${actionLabel} OTP - Gym Attendance Verification`;
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #111827;">Gym Attendance OTP Verification</h2>
+          <p>Hello ${safeMemberName},</p>
+          <p>Your OTP for <strong>${actionLabel}</strong> verification is:</p>
+          <div style="font-size: 32px; font-weight: bold; letter-spacing: 4px; color: #16a34a; margin: 16px 0;">${otp}</div>
+          <p>This OTP expires in ${expiresInMinutes} minutes and can be used only once.</p>
+          <p>If you did not request this, please contact the gym desk immediately.</p>
+          <hr style="margin: 20px 0; border: none; border-top: 1px solid #e5e7eb;" />
+          <p style="color: #6b7280; font-size: 12px;">
+            Olympia Fitness | Secure Email Verification
+          </p>
+        </div>
+      `;
+
+      const plainText = `
 Gym Attendance OTP Verification
 
 Hello ${safeMemberName},
@@ -99,42 +119,68 @@ Your OTP for ${actionLabel} verification is: ${otp}
 This OTP expires in ${expiresInMinutes} minutes and can be used only once.
 
 If you did not request this, please contact the gym desk immediately.
-    `.trim();
+      `.trim();
 
-    console.log(`[EMAIL] Sending ${actionLabel} OTP email to ${toEmail}`);
-    console.log(
-      `[EMAIL] SMTP: ${SMTP_EMAIL} via ${SMTP_HOST}:${SMTP_PORT}`
-    );
+      console.log(`[EMAIL] Attempt ${attempt}/${maxRetries}: Sending ${actionLabel} OTP email to ${toEmail}`);
+      console.log(`[EMAIL] SMTP: ${SMTP_EMAIL} via ${SMTP_HOST}:${SMTP_PORT}`);
 
-    const info = await trans.sendMail({
-      from: SMTP_EMAIL,
-      to: toEmail,
-      subject,
-      text: plainText,
-      html,
-      replyTo: SMTP_EMAIL,
-    });
+      const info = await trans.sendMail({
+        from: SMTP_EMAIL,
+        to: toEmail,
+        subject,
+        text: plainText,
+        html,
+        replyTo: SMTP_EMAIL,
+      });
 
-    console.log(`[EMAIL] Email sent successfully`);
-    console.log(`[EMAIL] Message ID: ${info.messageId}`);
-    console.log(`[EMAIL] Response: ${info.response}`);
+      console.log(`[EMAIL] ✅ Email sent successfully on attempt ${attempt}`);
+      console.log(`[EMAIL] Message ID: ${info.messageId}`);
+      console.log(`[EMAIL] Response: ${info.response}`);
 
-    return {
-      success: true,
-      messageId: info.messageId,
-      response: info.response,
-    };
-  } catch (error) {
-    console.error(`[EMAIL] Error sending OTP email to ${toEmail}:`);
-    console.error(`[EMAIL] Error Message: ${error.message}`);
-    console.error(`[EMAIL] Error Code: ${error.code}`);
-    console.error(`[EMAIL] Full Error:`, error);
+      return {
+        success: true,
+        messageId: info.messageId,
+        response: info.response,
+        attempt,
+      };
+    } catch (error) {
+      lastError = error;
+      console.error(`[EMAIL] ❌ Attempt ${attempt} failed: ${error.message}`);
+      console.error(`[EMAIL] Error Code: ${error.code}`);
 
-    const err = new Error(`Failed to send OTP email: ${error.message}`);
-    err.statusCode = 500;
-    err.originalError = error;
-    throw err;
+      // If it's a connection error, reset transporter for next attempt
+      if (
+        error.code === "ECONNREFUSED" ||
+        error.code === "ETIMEDOUT" ||
+        error.code === "EHOSTUNREACH" ||
+        error.message.includes("Connection timeout") ||
+        error.message.includes("SMTP")
+      ) {
+        console.log(`[EMAIL] Connection error detected. Resetting transporter for retry...`);
+        initializeTransporter(true);
+
+        // Wait before retrying (exponential backoff)
+        if (attempt < maxRetries) {
+          const delayMs = Math.pow(2, attempt - 1) * 1000; // 1s, 2s, 4s
+          console.log(`[EMAIL] Waiting ${delayMs}ms before retry...`);
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+      } else {
+        // Non-retryable error
+        break;
+      }
+    }
   }
+
+  // All retries failed
+  console.error(`[EMAIL] All ${maxRetries} attempts failed`);
+  console.error(`[EMAIL] Final Error:`, lastError);
+
+  const err = new Error(`Failed to send OTP email after ${maxRetries} attempts: ${lastError.message}`);
+  err.statusCode = 500;
+  err.originalError = lastError;
+  err.attempts = maxRetries;
+  throw err;
 }
 
 /**
