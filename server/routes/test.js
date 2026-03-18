@@ -3,6 +3,49 @@ const router = express.Router();
 const EmailQueueManager = require("../utils/emailQueueManager");
 const { sendAttendanceOtpEmail, verifyConnection } = require("../utils/emailService");
 
+// GET /api/test/ping - Simple connectivity test
+router.get("/ping", (req, res) => {
+  res.json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    message: "Backend is reachable",
+  });
+});
+
+// GET /api/test/health - Detailed health check
+router.get("/health", async (req, res) => {
+  try {
+    console.log(`[HEALTH] Health check requested`);
+    
+    const healthStatus = {
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      backend: "operational",
+      services: {
+        email: "unknown",
+        queue: "unknown",
+      },
+    };
+
+    // Check email service
+    try {
+      await verifyConnection();
+      healthStatus.services.email = "operational";
+    } catch (err) {
+      healthStatus.services.email = `failed: ${err.message}`;
+      healthStatus.status = "degraded";
+    }
+
+    // Check queue
+    const queueStatus = EmailQueueManager.getQueueStatus();
+    healthStatus.services.queue = `operational (${queueStatus.queueSize} in queue)`;
+
+    res.json(healthStatus);
+  } catch (error) {
+    res.status(500).json({ status: "error", error: error.message });
+  }
+});
+
 // POST /api/test/send-email - Test email sending via queue
 router.post("/send-email", async (req, res) => {
   try {

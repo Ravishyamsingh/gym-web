@@ -73,13 +73,21 @@ api.interceptors.request.use(
     const user = auth.currentUser;
     if (user) {
       try {
-        const token = await user.getIdToken(true); // Force refresh for fresh token
+        // Add timeout for Firebase token refresh (5 seconds max)
+        const tokenPromise = user.getIdToken(true);
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Firebase token refresh timeout")), 5000)
+        );
+        const token = await Promise.race([tokenPromise, timeoutPromise]);
         config.headers.Authorization = `Bearer ${token}`;
         return config;
       } catch (err) {
         // Do not block requests if Firebase token refresh fails.
         // Fallback to JWT below if available.
-        console.warn("Failed to refresh Firebase ID token; falling back to JWT when available:", err?.code || err?.message || err);
+        console.warn(
+          "Failed to refresh Firebase ID token; falling back to JWT when available:",
+          err?.code || err?.message || err
+        );
       }
     }
 
@@ -155,9 +163,57 @@ api.interceptors.response.use(
         timeout: error.config?.timeout,
         elapsed: Date.now() - (error.config?.__startTime || 0),
       });
+    } else if (!error.response && error.code) {
+      // Network error or CORS issue
+      console.warn("Network/CORS error:", {
+        code: error.code,
+        message: error.message,
+        url: error.config?.url,
+        method: error.config?.method,
+      });
     }
     return Promise.reject(error);
   }
 );
+
+// Diagnostic function to test backend connectivity
+export async function testBackendHealth() {
+  try {
+    console.log("[DIAGNOSTICS] Testing backend health...");
+    const response = await api.get("/test/health", {
+      headers: { "Authorization": "" }, // Skip auth for health check
+    });
+    console.log("[DIAGNOSTICS] Backend health check passed:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("[DIAGNOSTICS] Backend health check failed:", {
+      status: error?.response?.status,
+      message: error?.message,
+      code: error?.code,
+      url: error?.config?.url,
+    });
+    throw error;
+  }
+}
+
+// Test simple ping
+export async function testBackendPing() {
+  try {
+    console.log("[DIAGNOSTICS] Testing backend ping...");
+    const response = await api.get("/test/ping", {
+      headers: { "Authorization": "" }, // Skip auth for ping
+    });
+    console.log("[DIAGNOSTICS] Backend ping successful:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("[DIAGNOSTICS] Backend ping failed:", {
+      status: error?.response?.status,
+      message: error?.message,
+      code: error?.code,
+      url: error?.config?.url,
+    });
+    throw error;
+  }
+}
 
 export default api;
