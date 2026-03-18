@@ -73,6 +73,7 @@ function initializeTransporter(forceReset = false) {
  * @param {string} params.otp - 6-digit OTP code
  * @param {string} params.action - "entry" or "exit"
  * @param {string} params.memberName - Member's name
+ * @param {string} params.userId - User ID for logging
  * @param {number} params.expiresInMinutes - OTP expiration time in minutes
  * @returns {Promise<Object>} Email send result
  */
@@ -81,12 +82,24 @@ async function sendAttendanceOtpEmail({
   otp,
   action,
   memberName,
+  userId,
   expiresInMinutes = 5,
 }) {
   const maxRetries = 2; // Reduced from 3 to 2
   const MAX_TOTAL_TIME = 20000; // 20 second hard timeout for entire operation
   let lastError = null;
   const startTime = Date.now();
+
+  console.log(`\n${'='.repeat(60)}`);
+  console.log(`[EMAIL] 📧 OTP EMAIL REQUEST STARTED`);
+  console.log(`${'='.repeat(60)}`);
+  console.log(`[EMAIL] Timestamp: ${new Date().toISOString()}`);
+  console.log(`[EMAIL] To Email: ${toEmail}`);
+  console.log(`[EMAIL] OTP: ${otp}`);
+  console.log(`[EMAIL] Action: ${action}`);
+  console.log(`[EMAIL] User ID: ${userId}`);
+  console.log(`[EMAIL] Member Name: ${memberName}`);
+  console.log(`${'='.repeat(60)}\n`);
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     // Check if we've exceeded total time budget
@@ -131,6 +144,7 @@ If you did not request this, please contact the gym desk immediately.
       `.trim();
 
       console.log(`[EMAIL] Attempt ${attempt}/${maxRetries}: Sending ${actionLabel} OTP email to ${toEmail}`);
+      console.log(`[EMAIL] SMTP Config: ${SMTP_EMAIL} via ${SMTP_HOST}:${SMTP_PORT} (TLS: ${SMTP_SECURE})`);
 
       const info = await trans.sendMail({
         from: SMTP_EMAIL,
@@ -155,7 +169,16 @@ If you did not request this, please contact the gym desk immediately.
     } catch (error) {
       lastError = error;
       const elapsedTime = Date.now() - startTime;
-      console.error(`[EMAIL] ❌ Attempt ${attempt} failed after ${elapsedTime}ms: ${error.message}`);
+      console.error(`\n${'='.repeat(60)}`);
+      console.error(`[EMAIL] ❌ ATTEMPT ${attempt} FAILED`);
+      console.error(`${'='.repeat(60)}`);
+      console.error(`[EMAIL] Time Elapsed: ${elapsedTime}ms`);
+      console.error(`[EMAIL] Error Message: ${error.message}`);
+      console.error(`[EMAIL] Error Code: ${error.code}`);
+      console.error(`[EMAIL] Error Type: ${error.name}`);
+      if (error.command) console.error(`[EMAIL] SMTP Command: ${error.command}`);
+      if (error.response) console.error(`[EMAIL] SMTP Response: ${error.response}`);
+      console.error(`${'='.repeat(60)}\n`);
       console.error(`[EMAIL] Error Code: ${error.code}`);
 
       // If it's a connection error, reset transporter for next attempt

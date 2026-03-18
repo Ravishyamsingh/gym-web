@@ -381,21 +381,39 @@ exports.checkOut = async (req, res, next) => {
 // ─────────────────────────────────────────────
 exports.requestFallbackOtp = async (req, res, next) => {
   try {
+    const requestId = `OTP-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    console.log(`\n${'='.repeat(70)}`);
+    console.log(`[OTP] 🔑 OTP REQUEST INITIATED - Request ID: ${requestId}`);
+    console.log(`${'='.repeat(70)}`);
+    
     pruneExpiredOtpEntries();
     const user = req.dbUser;
-    if (!user) return res.status(404).json({ error: "User not found" });
+    if (!user) {
+      console.log(`[OTP] ❌ User not found in request`);
+      return res.status(404).json({ error: "User not found" });
+    }
+    
+    console.log(`[OTP] User Found: ${user.name} (ID: ${user._id})`);
+    console.log(`[OTP] Registered Email: ${user.email}`);
 
     const email = String(req.body?.email || "").trim();
     const action = String(req.body?.action || "entry").trim().toLowerCase() === "exit" ? "exit" : "entry";
 
     if (!email) {
+      console.log(`[OTP] ❌ Email not provided in request`);
       return res.status(400).json({ error: "Email is required" });
     }
 
+    console.log(`[OTP] Requested Email: ${email}`);
+    console.log(`[OTP] Validating email match...`);
+
     // Exact-match enforcement as requested.
     if (email !== user.email) {
+      console.log(`[OTP] ❌ EMAIL MISMATCH! Requested: ${email}, Registered: ${user.email}`);
       return res.status(400).json({ error: "Email does not match your registered account email" });
     }
+    
+    console.log(`[OTP] ✅ Email validation passed`);
 
     if (action === "entry") {
       await validateEntryEligibilityOrThrow(user);
@@ -416,6 +434,8 @@ exports.requestFallbackOtp = async (req, res, next) => {
     const now = Date.now();
     const nextAllowedSendAt = now + OTP_RESEND_COOLDOWN_SECONDS * 1000;
 
+    console.log(`[OTP] Generated OTP: ${otp}`);
+
     // Store OTP FIRST - don't wait for email
     otpStore.set(key, {
       otpHash: hashOtp(otp),
@@ -428,7 +448,9 @@ exports.requestFallbackOtp = async (req, res, next) => {
       nextAllowedSendAt,
     });
 
-    console.log(`[OTP] OTP stored for ${action} action for user ${user._id}`);
+    console.log(`[OTP] ✅ OTP stored in memory for ${action === "exit" ? "EXIT" : "ENTRY"} action`);
+    console.log(`[OTP] Expires at: ${new Date(now + OTP_TTL_MINUTES * 60 * 1000).toISOString()}`);
+    console.log(`[OTP] Sending email in background...`);
 
     // Send email in BACKGROUND - don't block the response
     console.log(`[OTP] Starting background email send for ${email}`);
@@ -437,17 +459,21 @@ exports.requestFallbackOtp = async (req, res, next) => {
       otp,
       action,
       memberName: user.name,
+      userId: user._id,
       expiresInMinutes: OTP_TTL_MINUTES,
     })
       .then(() => {
-        console.log(`[OTP] ✅ Background email sent successfully for user ${user._id}`);
+        console.log(`[OTP] ✅ Background email send COMPLETED successfully`);
+        console.log(`${'='.repeat(70)}\n`);
       })
       .catch((emailError) => {
-        console.error(`[OTP] ❌ Background email send failed for user ${user._id}:`, emailError.message);
-        // Email failed but OTP is already stored, user can still try again
+        console.error(`[OTP] ❌ Background email send FAILED`);
+        console.error(`[OTP] Error: ${emailError.message}`);
+        console.error(`${'='.repeat(70)}\n`);
       });
 
     // Respond immediately - don't wait for email
+    console.log(`[OTP] 📤 Sending success response to client immediately`);
     return res.json({
       message: `OTP sent to ${email}`,
       otpSent: true,

@@ -388,15 +388,12 @@ export default function VerifyFace() {
           <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-4 space-y-3 text-left">
             <p className="text-sm font-semibold text-yellow-300">Email OTP Fallback</p>
             <p className="text-xs text-yellow-200/80">
-              Use OTP if camera/face verification fails. Code expires in {otpExpiryMinutes} minutes.
+              We'll send a 6-digit code to your registered email. Code expires in {otpExpiryMinutes} minutes.
             </p>
-            <input
-              type="email"
-              value={fallbackEmail}
-              onChange={(e) => setFallbackEmail(e.target.value)}
-              placeholder="Enter your registered email"
-              className="w-full rounded-lg border border-white/15 bg-void/60 px-3 py-2 text-sm text-light placeholder-white/40 focus:outline-none focus:border-yellow-500/40"
-            />
+            <div className="rounded-lg border border-white/15 bg-void/60 px-3 py-2">
+              <p className="text-xs text-white/50 mb-1">Registered Email</p>
+              <p className="text-sm text-light font-medium break-all">{fallbackEmail}</p>
+            </div>
 
             {!otpSent && (
               <Button
