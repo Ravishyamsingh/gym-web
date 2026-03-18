@@ -66,7 +66,11 @@ exports.handlePaymentWebhook = async (req, res, next) => {
     }
 
     // Use raw body for signature verification
-    const rawBody = req.rawBody || JSON.stringify(req.body);
+    const rawBody = req.rawBody;
+    if (!rawBody) {
+      console.error("❌ Raw body not captured for webhook — middleware may have failed");
+      return res.status(400).json({ error: "Invalid webhook request: raw body not found" });
+    }
 
     const isSignatureValid = verifyWebhookSignature(rawBody, webhookSignature);
     if (!isSignatureValid) {

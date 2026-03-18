@@ -26,7 +26,7 @@ const razorpay = new Razorpay({
 // Plan Prices (in paise — multiply INR by 100)
 // ─────────────────────────────────────────────────────────────────
 const PLAN_PRICES = {
-  "1month": 60000, // ₹600
+  "1month": 100, // ₹1 (Testing - change back to 60000 for ₹600 after testing)
   "6months": 300000, // ₹3000
   "1year": 540000, // ₹5400
 };

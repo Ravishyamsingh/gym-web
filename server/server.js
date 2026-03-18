@@ -90,26 +90,26 @@ app.use((req, res, next) => {
 
 // ════════════════════════════════════════════════════════════════════
 // IMPORTANT: Webhook middleware must come BEFORE json parsing
-// This preserves raw body for signature verification
+// This preserves raw body for signature verification using express.raw()
 // ════════════════════════════════════════════════════════════════════
-// Capture raw body for webhook signature verification
-app.use((req, res, next) => {
-  if (req.path.startsWith("/api/webhooks")) {
-    // Store raw body for webhooks
-    let rawBody = "";
-    req.on("data", (chunk) => {
-      rawBody += chunk.toString();
-    });
-    req.on("end", () => {
-      req.rawBody = rawBody;
-      next();
-    });
-  } else {
-    next();
+// Capture raw body for webhook routes ONLY using express.raw()
+app.use("/api/webhooks", express.raw({ type: "application/json" }), (req, res, next) => {
+  // Store raw body as string for signature verification
+  const rawBodyString = req.body.toString("utf8");
+  req.rawBody = rawBodyString;
+  
+  // Also parse body as JSON for accessing event/payload
+  try {
+    req.body = JSON.parse(rawBodyString);
+  } catch (err) {
+    console.error("❌ Failed to parse webhook JSON body:", err.message);
+    return res.status(400).json({ error: "Invalid JSON in request body" });
   }
+  
+  next();
 });
 
-// Parse JSON for all routes
+// Parse JSON for all OTHER routes
 app.use(express.json({ limit: "10mb" })); // larger limit for face-descriptor payloads
 
 // ── Health check ────────────────────────────
