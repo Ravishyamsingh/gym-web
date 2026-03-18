@@ -196,12 +196,18 @@ export default function AdminPayments() {
                             <td className="py-3 pr-4">
                               <Badge
                                 variant={
-                                  p.status === "paid" ? "active" : p.status === "pending" ? "pending" : "blocked"
+                                  p.status === "paid" 
+                                    ? "active" 
+                                    : p.status === "pending" 
+                                    ? "pending" 
+                                    : p.status === "cancelled"
+                                    ? "outline"
+                                    : "blocked"
                                 }
-                        >
-                          {p.status}
-                        </Badge>
-                      </td>
+                              >
+                                {p.status === "cancelled" ? "Superseded" : p.status}
+                              </Badge>
+                            </td>
                       <td className="py-3 pr-4 text-white/60">
                         {p.paymentDate ? new Date(p.paymentDate).toLocaleDateString() : "—"}
                       </td>

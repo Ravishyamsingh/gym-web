@@ -16,11 +16,11 @@ const userSchema = new mongoose.Schema(
       type: String,
       unique: true,
       sparse: true,
-      lowercase: true,
       trim: true,
-      minlength: 3,
-      maxlength: 20,
-      match: /^[a-z0-9_-]+$/i, // alphanumeric, underscore, hyphen only
+      minlength: 4,
+      maxlength: 4,
+      match: /^\d{4}$/, // exactly 4 digits (2000-9999)
+      index: true,
     },
     password: {
       type: String,
@@ -108,6 +108,43 @@ const userSchema = new mongoose.Schema(
     registrationFeePaymentDate: {
       type: Date,
       default: null,
+    },
+    // First-time user flag (set once, never changed)
+    isFirstTimeUser: {
+      type: Boolean,
+      default: true,
+      index: true,
+      description: "Set to true on creation, changed to false on first membership activation",
+    },
+    // Last membership update timestamp
+    lastMembershipUpdate: {
+      type: Date,
+      default: null,
+      index: true,
+      description: "Timestamp of last membership status/plan change",
+    },
+    // Historical membership count (never decremented)
+    totalMembershipsActivated: {
+      type: Number,
+      default: 0,
+      description: "Total number of times membership has been activated (for analytics)",
+    },
+    // Soft-delete flag
+    isDeleted: {
+      type: Boolean,
+      default: false,
+      index: true,
+      description: "Never hard-delete users; set isDeleted=true for compliance",
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
+      description: "When the user account was marked as deleted",
+    },
+    deletionReason: {
+      type: String,
+      default: null,
+      description: "Reason for account deletion",
     },
   },
   { timestamps: true }

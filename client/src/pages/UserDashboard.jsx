@@ -364,6 +364,9 @@ export default function UserDashboard() {
                       <span className="text-sm text-white/90 flex items-center gap-1.5">
                         <Mail size={14} className="shrink-0 text-white/60" /> {dbUser?.email || "—"}
                       </span>
+                      <span className="text-sm text-white/90 flex items-center gap-1.5 font-mono">
+                        ID: {dbUser?.userId || "—"}
+                      </span>
                       <span className="text-sm text-white/90 flex items-center gap-1.5">
                         <CalendarDays size={14} className="shrink-0 text-white/60" /> Joined {formatDate(dbUser?.joinDate, { year: "numeric", month: "short" })}
                       </span>

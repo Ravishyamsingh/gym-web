@@ -20,7 +20,6 @@ export default function RegisterPage() {
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [userId, setUserId] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
@@ -62,12 +61,6 @@ export default function RegisterPage() {
       setError("Passwords don't match");
       return false;
     }
-    if (userId && !/^[a-z0-9_-]{3,20}$/i.test(userId)) {
-      setError(
-        "User ID must be 3-20 characters (alphanumeric, underscore, hyphen)"
-      );
-      return false;
-    }
     return true;
   };
 
@@ -84,7 +77,6 @@ export default function RegisterPage() {
     try {
       const user = await signupWithPassword(
         email,
-        userId || null,
         sanitizePassword(password),
         name
       );
@@ -184,24 +176,6 @@ export default function RegisterPage() {
               disabled={loading}
               required
             />
-          </div>
-
-          {/* User ID (Optional) */}
-          <div className="space-y-2">
-            <Label htmlFor="userId">
-              User ID <span className="text-white/40">(optional)</span>
-            </Label>
-            <Input
-              id="userId"
-              type="text"
-              placeholder="john_doe123"
-              value={userId}
-              onChange={(e) => setUserId(e.target.value.toLowerCase())}
-              disabled={loading}
-            />
-            <p className="text-xs text-white/40">
-              3-20 characters: letters, numbers, underscore, hyphen
-            </p>
           </div>
 
           {/* Password */}

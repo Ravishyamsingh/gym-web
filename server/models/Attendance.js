@@ -71,7 +71,21 @@ const attendanceSchema = new mongoose.Schema({
     enum: ["face", "email_otp", null],
     default: null,
   },
+  // Soft-delete flag: records are never hard-deleted
+  isHidden: {
+    type: Boolean,
+    default: false,
+    index: true,
+    description: "If true, record is hidden from UI after ATTENDANCE_RETENTION_DAYS but kept in database",
+  },
+  hiddenAt: {
+    type: Date,
+    default: null,
+    description: "When the record was marked as hidden",
+  },
 });
+
+
 
 attendanceSchema.pre("validate", function syncCompatibilityFields(next) {
   const effectiveEntry = this.entryTime || this.checkInAt || this.timestamp || new Date();
@@ -101,7 +115,16 @@ attendanceSchema.pre("validate", function syncCompatibilityFields(next) {
 attendanceSchema.index({ timestamp: -1 });
 attendanceSchema.index({ userId: 1, sessionStatus: 1, checkInAt: -1 });
 attendanceSchema.index({ userId: 1, currentStatus: 1, entryTime: -1 });
-// Auto-delete attendance documents older than 30 days.
-attendanceSchema.index({ timestamp: 1 }, { expireAfterSeconds: ATTENDANCE_RETENTION_SECONDS });
+
+// Index for filtering visible records (last 30 days)
+attendanceSchema.index({ isHidden: 1, entryTime: -1 });
+attendanceSchema.index({ userId: 1, isHidden: 1, entryTime: -1 });
+
+// ⚠️ REMOVED: Auto-delete attendance documents older than 30 days
+// NOTE: Records are now permanently kept in database but marked as isHidden=true
+// for records older than 30 days. This ensures complete audit trail.
+// To migrate existing data and hide old records, run:
+// db.attendances.updateMany({timestamp: {$lt: new Date(Date.now() - 30*24*60*60*1000)}, isHidden: false}, {$set: {isHidden: true, hiddenAt: new Date()}})
 
 module.exports = mongoose.model("Attendance", attendanceSchema);
+

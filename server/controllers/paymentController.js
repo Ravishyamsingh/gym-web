@@ -18,6 +18,7 @@ exports.getAll = async (req, res, next) => {
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
     const q = (req.query.q || "").trim();
     const skip = (page - 1) * limit;
+    const includeCancelled = req.query.includeCancelled === "true";
 
     const pipeline = [
       {
@@ -35,6 +36,15 @@ exports.getAll = async (req, res, next) => {
         },
       },
     ];
+
+    // Filter out cancelled payments by default (show only active payment records)
+    if (!includeCancelled) {
+      pipeline.push({
+        $match: {
+          status: { $ne: "cancelled" },
+        },
+      });
+    }
 
     if (q) {
       pipeline.push({
@@ -85,6 +95,9 @@ exports.getAll = async (req, res, next) => {
       page,
       limit,
       pages: Math.ceil(total / limit) || 1,
+      filters: {
+        includeCancelled,
+      },
     });
   } catch (err) {
     next(err);
@@ -97,6 +110,8 @@ exports.getAll = async (req, res, next) => {
 // ─────────────────────────────────────────────
 exports.getStats = async (_req, res, next) => {
   try {
+    console.log("📊 Fetching payment stats...");
+    
     const [summary] = await Payment.aggregate([
       {
         $group: {
@@ -126,9 +141,16 @@ exports.getStats = async (_req, res, next) => {
               $cond: [{ $eq: ["$status", "failed"] }, 1, 0],
             },
           },
+          cancelledCount: {
+            $sum: {
+              $cond: [{ $eq: ["$status", "cancelled"] }, 1, 0],
+            },
+          },
         },
       },
     ]);
+
+    console.log("✅ Payment stats summary:", summary);
 
     return res.json({
       stats: summary || {
@@ -137,9 +159,11 @@ exports.getStats = async (_req, res, next) => {
         paidCount: 0,
         pendingCount: 0,
         failedCount: 0,
+        cancelledCount: 0,
       },
     });
   } catch (err) {
+    console.error("❌ Error in getStats:", err);
     next(err);
   }
 };
@@ -270,6 +294,7 @@ exports.createOrder = async (req, res, next) => {
       planId,
       duration,
       expiryDate,
+      paymentDate: new Date(), // Explicitly set payment date
       status: "pending", // Status will be "paid" only after webhook confirmation
       razorpayOrderId: razorpayOrder.id,
       paymentProcessor: "razorpay",
@@ -502,11 +527,40 @@ exports.processMembership = async (req, res, next) => {
     const { userId, planId, amount, bypassPayment } = req.body;
     const currentUser = req.dbUser;
 
+    // ─────────────────────────────────────────────────────────────
+    // DEPRECATION WARNING
+    // ─────────────────────────────────────────────────────────────
+    console.warn(
+      `⚠️  DEPRECATED: Direct payment processing via /api/payments/process`
+    );
+    console.warn(
+      `   Admin: ${currentUser.email} (${currentUser._id})`
+    );
+    console.warn(
+      `   User: ${userId}`
+    );
+    console.warn(
+      `   Please use POST /api/admin/membership/update instead`
+    );
+    console.warn(
+      `   This endpoint will be removed in a future version`
+    );
+
     // Only allow if explicitly bypassing payment (admin action)
     if (!bypassPayment || currentUser.role !== "admin") {
       return res.status(403).json({
         error:
-          "This endpoint is deprecated. Use POST /api/payments/create-order instead.",
+          "This endpoint is deprecated. Use POST /api/admin/membership/update instead.",
+        deprecationNotice: {
+          message: "This endpoint will be removed in a future version",
+          replacement: "POST /api/admin/membership/update",
+          replacementBody: {
+            userId: "user_id_here",
+            newStatus: "active",
+            planId: "1month|6months|1year",
+            reason: "Optional reason for change"
+          }
+        }
       });
     }
 
@@ -519,6 +573,10 @@ exports.processMembership = async (req, res, next) => {
 
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ error: "User not found" });
+
+    console.warn(
+      `⚠️  Processing membership via deprecated endpoint - this should call membershipService instead`
+    );
 
     // Calculate expiry date
     const expiryDate = new Date();
@@ -548,10 +606,16 @@ exports.processMembership = async (req, res, next) => {
     user.membershipExpiry = expiryDate;
     await user.save();
 
-    console.log(`⚠️  Manual payment created by admin: ${payment._id}`);
+    console.warn(`⚠️  Manual payment created by admin (DEPRECATED METHOD): ${payment._id}`);
+    console.warn(`    Use POST /api/admin/membership/update instead for proper audit trail`);
 
     return res.status(201).json({
-      message: "Payment recorded (manual, for testing only)",
+      message: "Payment recorded (manual, for testing only) - DEPRECATED ENDPOINT",
+      deprecationWarning: {
+        message: "This endpoint is deprecated",
+        replacement: "POST /api/admin/membership/update",
+        willBeRemovedIn: "v2.0.0"
+      },
       payment,
       user,
     });

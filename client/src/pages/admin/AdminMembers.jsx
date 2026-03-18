@@ -7,7 +7,8 @@ import { ErrorState } from "@/components/ui/ErrorState";
 import { motion } from "framer-motion";
 import api from "@/lib/api";
 import { useToast } from "@/lib/useToast";
-import { ShieldOff, ShieldCheck, Download, Edit2, Check, X, Search, X as XIcon, ChevronLeft, ChevronRight } from "lucide-react";
+import MembershipDialog from "@/components/admin/MembershipDialog";
+import { ShieldOff, ShieldCheck, Download, Edit2, Search, X as XIcon, ChevronLeft, ChevronRight } from "lucide-react";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -16,12 +17,11 @@ export default function AdminMembers() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [editingUserId, setEditingUserId] = useState(null);
-  const [editingStatus, setEditingStatus] = useState("");
   const [updatingId, setUpdatingId] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, type: null, userId: null, action: null });
+  const [membershipDialog, setMembershipDialog] = useState({ isOpen: false, user: null });
 
   const fetchUsers = async () => {
     try {
@@ -67,19 +67,17 @@ export default function AdminMembers() {
     });
   };
 
-  const handleUpdatePaymentStatus = async (userId, newStatus) => {
-    try {
-      setUpdatingId(userId);
-      await api.put(`/users/${userId}/payment-status`, { paymentStatus: newStatus });
-      success(`Payment status updated to ${newStatus}`);
-      setEditingUserId(null);
-      fetchUsers();
-    } catch (err) {
-      errorToast("Failed to update payment status");
-      console.error("Payment status update error:", err);
-    } finally {
-      setUpdatingId(null);
-    }
+  const openMembershipDialog = (user) => {
+    setMembershipDialog({ isOpen: true, user });
+  };
+
+  const closeMembershipDialog = () => {
+    setMembershipDialog({ isOpen: false, user: null });
+  };
+
+  const handleMembershipSuccess = (message) => {
+    success(message);
+    fetchUsers();
   };
 
   const handleExport = async () => {
@@ -178,87 +176,58 @@ export default function AdminMembers() {
 
                 return (
                   <>
-                    <table className="w-full text-left text-sm">
+                    <table className="w-full text-left text-sm" style={{ minWidth: "1000px" }}>
                       <thead>
                       <tr className="border-b border-white/5 text-xs uppercase text-white/40">
-                        <th className="py-3 pr-4">Name</th>
-                        <th className="py-3 pr-4">Email</th>
-                        <th className="py-3 pr-4">User ID</th>
-                        <th className="py-3 pr-4">Payment</th>
-                        <th className="py-3 pr-4">Status</th>
-                        <th className="py-3 pr-4">Streak</th>
-                        <th className="py-3 text-right">Action</th>
+                        <th className="py-3 pr-4 whitespace-nowrap min-w-max">Name</th>
+                        <th className="py-3 pr-4 whitespace-nowrap min-w-max">Email</th>
+                        <th className="py-3 pr-4 whitespace-nowrap min-w-max">User ID</th>
+                        <th className="py-3 pr-4 whitespace-nowrap min-w-max">Membership</th>
+                        <th className="py-3 pr-4 whitespace-nowrap min-w-max">Plan</th>
+                        <th className="py-3 pr-4 whitespace-nowrap min-w-max">Expiry</th>
+                        <th className="py-3 pr-4 whitespace-nowrap min-w-max">Streak</th>
+                        <th className="py-3 text-right whitespace-nowrap min-w-max">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
                       {paginatedUsers.map((u) => (
                         <tr key={u._id} className="hover:bg-white/[0.02] transition-colors">
-                          <td className="py-3 pr-4 font-medium text-light">{u.name}</td>
-                      <td className="py-3 pr-4 text-white/60">{u.email}</td>
-                      <td className="py-3 pr-4 text-white/60">{u.userId || "—"}</td>
-                      <td className="py-3 pr-4">
-                        {editingUserId === u._id ? (
-                          <motion.div
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            className="flex items-center gap-2"
-                          >
-                            <select
-                              value={editingStatus}
-                              onChange={(e) => setEditingStatus(e.target.value)}
-                              className="bg-white/5 border border-white/10 text-light text-xs rounded px-2 py-1 focus:outline-none focus:border-blood"
-                            >
-                              <option value="active">Active</option>
-                              <option value="pending">Pending</option>
-                              <option value="expired">Expired</option>
-                            </select>
-                            <button
-                              onClick={() => handleUpdatePaymentStatus(u._id, editingStatus)}
-                              disabled={updatingId === u._id}
-                              className="text-emerald-400 hover:text-emerald-300 disabled:opacity-50"
-                            >
-                              <Check size={14} />
-                            </button>
-                            <button
-                              onClick={() => setEditingUserId(null)}
-                              disabled={updatingId === u._id}
-                              className="text-white/40 hover:text-white/60 disabled:opacity-50"
-                            >
-                              <X size={14} />
-                            </button>
-                          </motion.div>
-                        ) : (
-                          <button
-                            onClick={() => {
-                              setEditingUserId(u._id);
-                              setEditingStatus(u.paymentStatus);
-                            }}
-                            className="inline-flex items-center gap-2 cursor-pointer hover:opacity-75 transition"
-                          >
-                            <Badge
-                              variant={
-                                u.paymentStatus === "active"
-                                  ? "active"
-                                  : u.paymentStatus === "pending"
-                                  ? "pending"
-                                  : "expired"
-                              }
-                            >
-                              {u.paymentStatus}
-                            </Badge>
-                            <Edit2 size={12} className="text-white/40" />
-                          </button>
-                        )}
+                          <td className="py-3 pr-4 font-medium text-light whitespace-nowrap min-w-max">{u.name}</td>
+                      <td className="py-3 pr-4 text-white/60 text-sm whitespace-nowrap min-w-max">{u.email}</td>
+                      <td className="py-3 pr-4 text-white/60 font-mono text-xs whitespace-nowrap min-w-max">{u.userId || "—"}</td>
+                      <td className="py-3 pr-4 whitespace-nowrap min-w-max">
+                        <Badge
+                          variant={
+                            u.paymentStatus === "active"
+                              ? "active"
+                              : u.paymentStatus === "pending"
+                              ? "pending"
+                              : "expired"
+                          }
+                        >
+                          {u.paymentStatus}
+                        </Badge>
                       </td>
-                      <td className="py-3 pr-4">
-                        {u.isBlocked ? (
-                          <Badge variant="blocked">Blocked</Badge>
-                        ) : (
-                          <Badge variant="active">Active</Badge>
-                        )}
+                      <td className="py-3 pr-4 whitespace-nowrap min-w-max">
+                        <span className="text-xs font-mono bg-white/5 px-2 py-1 rounded">
+                          {u.membershipPlan || "—"}
+                        </span>
                       </td>
-                      <td className="py-3 pr-4 font-display text-lg font-bold">{u.currentStreak}</td>
-                      <td className="py-3 text-right">
+                      <td className="py-3 pr-4 text-xs text-white/60 whitespace-nowrap min-w-max">
+                        {u.membershipExpiry
+                          ? new Date(u.membershipExpiry).toLocaleDateString()
+                          : "—"}
+                      </td>
+                      <td className="py-3 pr-4 font-display text-lg font-bold text-blood whitespace-nowrap min-w-max">{u.currentStreak}</td>
+                      <td className="py-3 text-right flex items-center justify-end gap-2 whitespace-nowrap min-w-max">
+                        <button
+                          onClick={() => openMembershipDialog(u)}
+                          className="p-1.5 bg-blood/10 hover:bg-blood/20 border border-blood/30 rounded-lg transition text-blood disabled:opacity-50"
+                          disabled={updatingId === u._id}
+                          title="Update membership"
+                        >
+                          <Edit2 size={16} />
+                        </button>
                         <Button
                           variant={u.isBlocked ? "outline" : "destructive"}
                           size="sm"
@@ -337,6 +306,14 @@ export default function AdminMembers() {
         isPending={updatingId === confirmDialog.userId}
         onConfirm={() => handleToggleBlock(confirmDialog.userId, confirmDialog.isCurrentlyBlocked)}
         onCancel={() => setConfirmDialog({ isOpen: false, type: null, userId: null, action: null })}
+      />
+
+      {/* Membership Dialog */}
+      <MembershipDialog
+        isOpen={membershipDialog.isOpen}
+        user={membershipDialog.user}
+        onClose={closeMembershipDialog}
+        onSuccess={handleMembershipSuccess}
       />
     </motion.div>
   );

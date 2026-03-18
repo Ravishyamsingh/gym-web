@@ -15,7 +15,6 @@ import {
   MapPin,
   Phone,
   Mail,
-  MessageCircle,
 } from "lucide-react";
 
 
@@ -273,7 +272,7 @@ export default function LandingPage() {
             className="p-2 rounded-lg bg-white/5 hover:bg-emerald-500/20 transition-colors duration-300 group"
             title="Chat on WhatsApp"
           >
-            <MessageCircle className="w-5 h-5 text-white/70 group-hover:text-emerald-400 transition-colors" />
+            <img src="/whatsapp.png" alt="WhatsApp" className="w-5 h-5 opacity-70 group-hover:opacity-100 transition-opacity" />
           </a>
           <Link to="/login">
             <Button variant="ghost" size="sm">Log In</Button>
@@ -672,7 +671,7 @@ export default function LandingPage() {
             transition={{ duration: 0.5, delay: 0.3 }}
             className="mt-4 max-w-2xl mx-auto bg-gradient-to-r from-emerald-500/10 to-emerald-400/5 border border-emerald-500/30 rounded-xl p-4 flex items-start gap-3"
           >
-            <MessageCircle className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
+            <img src="/whatsapp.png" alt="WhatsApp" className="w-5 h-5 flex-shrink-0 mt-0.5 opacity-80" />
             <p className="text-center text-white/80 text-sm sm:text-base flex-1">
               <span className="font-semibold text-emerald-400">💬 Need More Details?</span> Connect with us on{" "}
               <a
@@ -858,7 +857,7 @@ export default function LandingPage() {
               <ul className="space-y-2 text-sm text-white/50">
                 <li className="flex items-center gap-2"><Phone size={14} className="text-blood" /> +91 8925148138</li>
                 <li className="flex items-center gap-2">
-                  <MessageCircle size={14} className="text-emerald-400" />
+                  <img src="/whatsapp.png" alt="WhatsApp" className="w-4 h-4 opacity-80" />
                   <a
                     href="https://wa.me/918925148138?text=Hi%20Om%20Muruga%20Olympia%20Fitness,%20I%20need%20more%20details%20about%20the%20gym."
                     target="_blank"

@@ -2,10 +2,10 @@ require("../config/loadEnv");
 
 const mongoose = require("mongoose");
 const User = require("../models/User");
+const { generateNextUserId } = require("../utils/userIdGenerator");
 
 const TEST_USER_NAME = process.env.TEST_USER_NAME || "Testing Account";
 const TEST_USER_EMAIL = (process.env.TEST_USER_EMAIL || "testing.account@gym.local").toLowerCase();
-const TEST_USER_ID = (process.env.TEST_USER_ID || "testmember01").toLowerCase();
 const TEST_USER_PASSWORD = process.env.TEST_USER_PASSWORD || "Test@123456";
 const FORCE_IN_PRODUCTION = String(process.env.ALLOW_TEST_ACCOUNT_IN_PRODUCTION || "false").toLowerCase() === "true";
 
@@ -25,14 +25,17 @@ async function seedTestUser() {
   membershipExpiry.setMonth(membershipExpiry.getMonth() + 6);
 
   let user = await User.findOne({
-    $or: [{ email: TEST_USER_EMAIL }, { userId: TEST_USER_ID }],
+    email: TEST_USER_EMAIL,
   }).select("+password");
 
   if (!user) {
+    // Auto-generate numeric user ID
+    const generatedUserId = await generateNextUserId();
+    
     user = new User({
       name: TEST_USER_NAME,
       email: TEST_USER_EMAIL,
-      userId: TEST_USER_ID,
+      userId: generatedUserId,
       password: TEST_USER_PASSWORD,
       authProvider: "password",
       isTestAccount: true,
@@ -55,7 +58,6 @@ async function seedTestUser() {
   } else {
     user.name = TEST_USER_NAME;
     user.email = TEST_USER_EMAIL;
-    user.userId = TEST_USER_ID;
     user.password = TEST_USER_PASSWORD;
     user.authProvider = "password";
     user.isTestAccount = true;
@@ -76,7 +78,7 @@ async function seedTestUser() {
 
   console.log("Test login credentials:");
   console.log(`  Email: ${TEST_USER_EMAIL}`);
-  console.log(`  User ID: ${TEST_USER_ID}`);
+  console.log(`  User ID: ${user.userId}`);
   console.log(`  Password: ${TEST_USER_PASSWORD}`);
 
   await mongoose.disconnect();

@@ -127,23 +127,71 @@ exports.getFaceDescriptor = async (req, res, next) => {
 // ─────────────────────────────────────────────
 // PUT /api/users/:id/payment-status
 // Admin-only: update a user's payment status.
+// ⚠️ DEPRECATED: Use POST /api/admin/membership/update instead
 // ─────────────────────────────────────────────
 exports.updatePaymentStatus = async (req, res, next) => {
   try {
     const { paymentStatus } = req.body;
+    const targetUserId = req.params.id;
+    const adminId = req.dbUser._id;
+    const adminEmail = req.dbUser.email;
+
+    // ─────────────────────────────────────────────
+    // DEPRECATION WARNING - LOG AND NOTIFY
+    // ─────────────────────────────────────────────
+    console.warn(
+      `⚠️  DEPRECATED: Direct payment status update via PUT /api/users/:id/payment-status`
+    );
+    console.warn(`   Admin: ${adminEmail} (${adminId})`);
+    console.warn(`   Target User: ${targetUserId}`);
+    console.warn(`   New Status: ${paymentStatus}`);
+    console.warn(
+      `   ⚠️  WARNING: This endpoint bypasses membership business logic`
+    );
+    console.warn(
+      `   Please use POST /api/admin/membership/update instead`
+    );
+
     if (!["active", "expired", "pending"].includes(paymentStatus)) {
-      return res.status(400).json({ error: "Invalid payment status" });
+      return res.status(400).json({ 
+        error: "Invalid payment status",
+        deprecationWarning: {
+          message: "This endpoint is deprecated - consider using POST /api/admin/membership/update",
+          reason: "Direct status updates do not maintain membership history or business logic",
+        }
+      });
     }
 
-    const user = await User.findById(req.params.id);
+    const user = await User.findById(targetUserId);
     if (!user) return res.status(404).json({ error: "User not found" });
 
+    const oldPaymentStatus = user.paymentStatus;
     user.paymentStatus = paymentStatus;
     await user.save();
 
+    if (paymentStatus === "active" && !user.membershipPlan) {
+      console.warn(
+        `⚠️  WARNING: User ${targetUserId} set to active status WITHOUT membership plan`
+      );
+      console.warn(
+        `   This is likely incomplete. Use POST /api/admin/membership/update instead`
+      );
+    }
+
     return res.json({
-      message: "Payment status updated",
+      message: "Payment status updated (DEPRECATED ENDPOINT)",
+      deprecationWarning: {
+        message: "This endpoint is deprecated",
+        replacement: "POST /api/admin/membership/update",
+        reason: "Direct status updates bypass membership business logic and audit trail",
+        willBeRemovedIn: "v2.0.0"
+      },
+      statusChange: {
+        from: oldPaymentStatus,
+        to: paymentStatus
+      },
       paymentStatus: user.paymentStatus,
+      note: "Note: Only payment status was updated. Consider using admin membership update for complete membership activation."
     });
   } catch (err) {
     next(err);

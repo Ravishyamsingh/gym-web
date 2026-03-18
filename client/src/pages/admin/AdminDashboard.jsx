@@ -4,10 +4,10 @@ import { Badge } from "@/components/ui/Badge";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { motion } from "framer-motion";
 import api from "@/lib/api";
-import { Users, Activity, AlertTriangle } from "lucide-react";
+import { Users, Activity, AlertTriangle, TrendingUp } from "lucide-react";
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState({ totalUsers: 0, liveNow: 0, blocked: 0 });
+  const [stats, setStats] = useState({ totalUsers: 0, liveNow: 0, blocked: 0, totalRevenue: 0, activeMembers: 0 });
   const [liveAttendees, setLiveAttendees] = useState([]);
   const [longSessionAlerts, setLongSessionAlerts] = useState(0);
   const [alertThresholdMinutes, setAlertThresholdMinutes] = useState(240);
@@ -18,9 +18,20 @@ export default function AdminDashboard() {
   const fetchStats = async () => {
     try {
       setError(null);
-      const statsRes = await api.get("/users/admin/stats");
+      const [statsRes, revenueRes] = await Promise.all([
+        api.get("/users/admin/stats"),
+        api.get("/admin/revenue/summary"),
+      ]);
+      
       const nextStats = statsRes.data?.stats || { totalUsers: 0, blocked: 0 };
-      setStats((prev) => ({ ...prev, ...nextStats }));
+      const revStats = revenueRes.data || {};
+      
+      setStats((prev) => ({
+        ...prev,
+        ...nextStats,
+        totalRevenue: revStats.totalRevenue || 0,
+        activeMembers: nextStats.totalUsers || 0,
+      }));
     } catch (err) {
       console.error("Dashboard stats fetch error:", err);
       setError(err.response?.data?.error || "Failed to load dashboard stats");
@@ -66,7 +77,8 @@ export default function AdminDashboard() {
   const statCards = [
     { label: "Total Members", value: stats.totalUsers, icon: Users, color: "text-light" },
     { label: "Live in Gym", value: stats.liveNow, icon: Activity, color: "text-emerald-400" },
-    { label: "Blocked", value: stats.blocked, icon: AlertTriangle, color: "text-blood" },
+    { label: "Total Revenue", value: `₹${(stats.totalRevenue || 0).toLocaleString()}`, icon: TrendingUp, color: "text-blood" },
+    { label: "Blocked", value: stats.blocked, icon: AlertTriangle, color: "text-orange-400" },
   ];
 
   const visibleAttendees = showAlertsOnly

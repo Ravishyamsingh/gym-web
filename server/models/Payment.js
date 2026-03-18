@@ -22,7 +22,7 @@ const paymentSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["pending", "paid", "failed", "overdue"],
+      enum: ["pending", "paid", "failed", "overdue", "cancelled"],
       default: "pending",
     },
     planId: {

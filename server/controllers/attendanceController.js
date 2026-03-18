@@ -709,6 +709,8 @@ exports.getLive = async (_req, res, next) => {
 // ─────────────────────────────────────────────
 // GET /api/attendance
 // Admin: return all attendance records (paginated).
+// Shows only records from last 30 days (isHidden=false)
+// Older records are soft-deleted (isHidden=true) but kept in DB
 // ─────────────────────────────────────────────
 exports.getAll = async (req, res, next) => {
   try {
@@ -722,13 +724,22 @@ exports.getAll = async (req, res, next) => {
     const skip = (page - 1) * limit;
     const retentionStart = getRetentionStartDate();
 
-    // Hard-delete records older than retention window.
-    await Attendance.deleteMany({
-      $or: [
-        { checkInAt: { $lt: retentionStart } },
-        { checkInAt: null, timestamp: { $lt: retentionStart } },
-      ],
-    });
+    // NOTE: No hard-delete anymore. Records are marked as isHidden instead.
+    // For old records that haven't been marked as hidden yet, mark them now
+    await Attendance.updateMany(
+      {
+        $or: [
+          { checkInAt: { $lt: retentionStart }, isHidden: false },
+          { checkInAt: null, timestamp: { $lt: retentionStart }, isHidden: false },
+        ],
+      },
+      {
+        $set: {
+          isHidden: true,
+          hiddenAt: new Date(),
+        },
+      }
+    );
 
     const pipeline = [
       {
@@ -753,7 +764,8 @@ exports.getAll = async (req, res, next) => {
     ];
 
     const match = {};
-    // Always restrict admin attendance history to last 30 days.
+    // Filter: Show only visible records (last 30 days, isHidden=false)
+    match.isHidden = false;
     match.effectiveCheckIn = { $gte: retentionStart };
 
     if (q) {
@@ -796,6 +808,7 @@ exports.getAll = async (req, res, next) => {
               sessionStatus: 1,
               currentStatus: 1,
               durationMinutes: 1,
+              isHidden: 1,
               userId: {
                 _id: "$user._id",
                 name: "$user.name",
@@ -826,6 +839,10 @@ exports.getAll = async (req, res, next) => {
       pages: Math.ceil(total / limit) || 1,
       retentionDays: ATTENDANCE_RETENTION_DAYS,
       retentionStart,
+      dataIntegrity: {
+        note: "Showing only visible records (last 30 days). Older records are archived but kept in database.",
+        isHiddenFalseOnly: true,
+      },
     });
   } catch (err) {
     next(err);

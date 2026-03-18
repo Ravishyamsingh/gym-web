@@ -208,9 +208,9 @@ export default function AdminAttendance() {
             {/* Summary */}
             <div className="flex items-center justify-between mt-6 pt-6 border-t border-white/5">
               <p className="text-xs text-white/40">
-                Showing all {total} attendance records from the last 30 days
+                Showing {attendance.length} visible attendance records (last 30 days)
               </p>
-              <p className="text-xs text-white/45">Older records are automatically removed after 30 days</p>
+              <p className="text-xs text-white/45">Older records are archived but kept for compliance</p>
             </div>
           </div>
         </CardContent>

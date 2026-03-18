@@ -1,6 +1,7 @@
 const User = require("../models/User");
 const jwt = require("jsonwebtoken");
 const admin = require("../config/firebase");
+const { generateNextUserId } = require("../utils/userIdGenerator");
 const JWT_SECRET = process.env.JWT_SECRET;
 
 function getAdminEmailSet() {
@@ -32,8 +33,8 @@ function validateEmail(email) {
 }
 
 function validateUserId(userId) {
-  // Alphanumeric, underscore, hyphen, 3-20 characters
-  const userIdRegex = /^[a-z0-9_-]{3,20}$/i;
+  // Numeric only, exactly 4 digits (2000-9999)
+  const userIdRegex = /^\d{4}$/;
   return userIdRegex.test(userId);
 }
 
@@ -71,14 +72,13 @@ function isValidFaceDescriptor(fd) {
 
 /**
  * POST /api/auth/register
- * Password-based signup with email or userId
- * Body: { email, userId, password, name }
+ * Password-based signup with auto-generated numeric user ID
+ * Body: { email, password, name }
  */
 exports.register = async (req, res, next) => {
   try {
-    const { email, userId, password, name } = req.body;
+    const { email, password, name } = req.body;
     const normalizedEmail = String(email || "").trim().toLowerCase();
-    const normalizedUserId = userId ? String(userId).trim().toLowerCase() : null;
 
     // Validation
     if (!email || !password || !name) {
@@ -98,13 +98,6 @@ exports.register = async (req, res, next) => {
       });
     }
 
-    if (userId && !validateUserId(userId)) {
-      return res.status(400).json({
-        error:
-          "User ID must be 3-20 characters, alphanumeric (a-z, 0-9, _, -)",
-      });
-    }
-
     // Check for existing email
     const existingEmail = await User.findOne({ email: normalizedEmail });
     if (existingEmail) {
@@ -113,22 +106,13 @@ exports.register = async (req, res, next) => {
       });
     }
 
-    // Check for existing userId
-    if (userId) {
-      const existingUserId = await User.findOne({
-        userId: normalizedUserId,
-      });
-      if (existingUserId) {
-        return res.status(409).json({
-          error: "User ID already taken. Please choose a different one.",
-        });
-      }
-    }
+    // Auto-generate numeric user ID (4 digits: 2000, 2001, etc.)
+    const generatedUserId = await generateNextUserId();
 
     // Create user
     const user = new User({
       email: normalizedEmail,
-      userId: normalizedUserId,
+      userId: generatedUserId,
       password: passwordValidation.sanitized,
       name: name.trim(),
       authProvider: "password",
@@ -137,7 +121,7 @@ exports.register = async (req, res, next) => {
 
     await user.save();
 
-    console.log(`[REGISTER] New user created: ${user.email}`);
+    console.log(`[REGISTER] New user created: ${user.email} with ID ${generatedUserId}`);
 
     // Generate JWT token for password-based auth
     const jwtToken = jwt.sign(

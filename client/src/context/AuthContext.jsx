@@ -98,13 +98,13 @@ export function AuthProvider({ children }) {
   };
 
   /**
-   * Signup with email, userId, password, and name
+   * Signup with email, password, and name
+   * User ID is auto-generated on the backend (numeric format)
    */
-  const signupWithPassword = async (email, userId, password, name) => {
+  const signupWithPassword = async (email, password, name) => {
     try {
       const response = await api.post("/auth/register", {
         email,
-        userId,
         password,
         name,
       });
