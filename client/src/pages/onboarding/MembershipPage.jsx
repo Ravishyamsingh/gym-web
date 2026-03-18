@@ -9,7 +9,7 @@ const MEMBERSHIP_PLANS = [
   {
     id: "1month",
     duration: "1 Month",
-    price: 600,
+    price: 1, // Testing mode - change back to 600 for production
     description: "Perfect for trying out the gym experience",
     features: [
       "Unlimited gym access",
