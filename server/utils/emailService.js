@@ -10,7 +10,8 @@ const SMTP_HOST = process.env.SMTP_HOST || "smtp.gmail.com";
 const SMTP_PORT = parseInt(process.env.SMTP_PORT || "587", 10);
 const SMTP_SECURE = String(process.env.SMTP_SECURE || "false").toLowerCase() === "true";
 const SMTP_EMAIL = process.env.SMTP_EMAIL || "";
-const SMTP_PASSWORD = process.env.SMTP_PASSWORD || "";
+// Trim spaces from password (Gmail app passwords shouldn't have spaces)
+const SMTP_PASSWORD = (process.env.SMTP_PASSWORD || "").replace(/\s/g, "");
 
 // Create transporter instance
 let transporter = null;
@@ -32,8 +33,14 @@ function initializeTransporter() {
       user: SMTP_EMAIL,
       pass: SMTP_PASSWORD,
     },
-    connectionTimeout: 10000,
-    socketTimeout: 10000,
+    connectionTimeout: 30000,
+    socketTimeout: 30000,
+    pool: {
+      maxConnections: 5,
+      maxMessages: 100,
+      rateDelta: 4000,
+      rateLimit: 14,
+    },
   });
 
   console.log(`[EMAIL] Nodemailer transporter initialized`);
