@@ -83,10 +83,19 @@ async function sendAttendanceOtpEmail({
   memberName,
   expiresInMinutes = 5,
 }) {
-  const maxRetries = 3;
+  const maxRetries = 2; // Reduced from 3 to 2
+  const MAX_TOTAL_TIME = 20000; // 20 second hard timeout for entire operation
   let lastError = null;
+  const startTime = Date.now();
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    // Check if we've exceeded total time budget
+    const elapsedTime = Date.now() - startTime;
+    if (elapsedTime > MAX_TOTAL_TIME) {
+      console.error(`[EMAIL] Hard timeout reached (${elapsedTime}ms). Aborting email send.`);
+      break;
+    }
+
     try {
       const trans = initializeTransporter();
 
@@ -122,7 +131,6 @@ If you did not request this, please contact the gym desk immediately.
       `.trim();
 
       console.log(`[EMAIL] Attempt ${attempt}/${maxRetries}: Sending ${actionLabel} OTP email to ${toEmail}`);
-      console.log(`[EMAIL] SMTP: ${SMTP_EMAIL} via ${SMTP_HOST}:${SMTP_PORT}`);
 
       const info = await trans.sendMail({
         from: SMTP_EMAIL,
@@ -133,19 +141,21 @@ If you did not request this, please contact the gym desk immediately.
         replyTo: SMTP_EMAIL,
       });
 
-      console.log(`[EMAIL] ✅ Email sent successfully on attempt ${attempt}`);
+      const totalTime = Date.now() - startTime;
+      console.log(`[EMAIL] ✅ Email sent successfully on attempt ${attempt} (${totalTime}ms)`);
       console.log(`[EMAIL] Message ID: ${info.messageId}`);
-      console.log(`[EMAIL] Response: ${info.response}`);
 
       return {
         success: true,
         messageId: info.messageId,
         response: info.response,
         attempt,
+        totalTime,
       };
     } catch (error) {
       lastError = error;
-      console.error(`[EMAIL] ❌ Attempt ${attempt} failed: ${error.message}`);
+      const elapsedTime = Date.now() - startTime;
+      console.error(`[EMAIL] ❌ Attempt ${attempt} failed after ${elapsedTime}ms: ${error.message}`);
       console.error(`[EMAIL] Error Code: ${error.code}`);
 
       // If it's a connection error, reset transporter for next attempt
@@ -159,21 +169,25 @@ If you did not request this, please contact the gym desk immediately.
         console.log(`[EMAIL] Connection error detected. Resetting transporter for retry...`);
         initializeTransporter(true);
 
-        // Wait before retrying (exponential backoff)
+        // Wait before retrying (exponential backoff but capped)
         if (attempt < maxRetries) {
-          const delayMs = Math.pow(2, attempt - 1) * 1000; // 1s, 2s, 4s
-          console.log(`[EMAIL] Waiting ${delayMs}ms before retry...`);
-          await new Promise(resolve => setTimeout(resolve, delayMs));
+          const remainingTime = MAX_TOTAL_TIME - elapsedTime;
+          const delayMs = Math.min(Math.pow(2, attempt - 1) * 500, remainingTime / 2); // 500ms, 1s, capped
+          if (delayMs > 0) {
+            console.log(`[EMAIL] Waiting ${delayMs}ms before retry...`);
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+          }
         }
       } else {
         // Non-retryable error
+        console.log(`[EMAIL] Non-retryable error. Stopping retries.`);
         break;
       }
     }
   }
 
   // All retries failed
-  console.error(`[EMAIL] All ${maxRetries} attempts failed`);
+  console.error(`[EMAIL] All ${maxRetries} attempts failed after ${Date.now() - startTime}ms`);
   console.error(`[EMAIL] Final Error:`, lastError);
 
   const err = new Error(`Failed to send OTP email after ${maxRetries} attempts: ${lastError.message}`);

@@ -416,24 +416,7 @@ exports.requestFallbackOtp = async (req, res, next) => {
     const now = Date.now();
     const nextAllowedSendAt = now + OTP_RESEND_COOLDOWN_SECONDS * 1000;
 
-    // Send email FIRST - only store OTP if email send succeeds
-    console.log(`[OTP] Attempting to send ${action} OTP to ${email} for user ${user._id}`);
-    try {
-      await sendAttendanceOtpEmail({
-        toEmail: email,
-        otp,
-        action,
-        memberName: user.name,
-        expiresInMinutes: OTP_TTL_MINUTES,
-      });
-      console.log(`[OTP] Email sent successfully for user ${user._id}`);
-    } catch (emailError) {
-      console.error(`[OTP] Email send failed for user ${user._id}:`, emailError.message);
-      // Don't store OTP if email failed - let error bubble up
-      throw emailError;
-    }
-
-    // Only store OTP if email was sent successfully
+    // Store OTP FIRST - don't wait for email
     otpStore.set(key, {
       otpHash: hashOtp(otp),
       email,
@@ -445,6 +428,26 @@ exports.requestFallbackOtp = async (req, res, next) => {
       nextAllowedSendAt,
     });
 
+    console.log(`[OTP] OTP stored for ${action} action for user ${user._id}`);
+
+    // Send email in BACKGROUND - don't block the response
+    console.log(`[OTP] Starting background email send for ${email}`);
+    sendAttendanceOtpEmail({
+      toEmail: email,
+      otp,
+      action,
+      memberName: user.name,
+      expiresInMinutes: OTP_TTL_MINUTES,
+    })
+      .then(() => {
+        console.log(`[OTP] ✅ Background email sent successfully for user ${user._id}`);
+      })
+      .catch((emailError) => {
+        console.error(`[OTP] ❌ Background email send failed for user ${user._id}:`, emailError.message);
+        // Email failed but OTP is already stored, user can still try again
+      });
+
+    // Respond immediately - don't wait for email
     return res.json({
       message: `OTP sent to ${email}`,
       otpSent: true,
