@@ -31,7 +31,7 @@ export default function FaceReregistrationModal({ isOpen, onClose, onSuccess }) 
     setError(null);
 
     try {
-      setMessage("Loading face models...");
+      setMessage("Loading face models (this may take 30-60 seconds)...");
       await loadFaceModels();
 
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -58,8 +58,19 @@ export default function FaceReregistrationModal({ isOpen, onClose, onSuccess }) 
       setMessage("Ready to re-register face");
     } catch (err) {
       console.error("[FaceReregister] Init failed:", err);
+      
+      let errorMessage = err.message || "Failed to start camera";
+      let helpText = "";
+      
+      // Provide specific help for different error types
+      if (err.message?.includes("model") || err.message?.includes("Models")) {
+        helpText = "Face models failed to load. Please: 1) Clear browser cache, 2) Restart browser, 3) Check internet.";
+      } else if (err.message?.includes("camera") || err.message?.includes("Permission")) {
+        helpText = "Camera access denied. Check your browser permissions.";
+      }
+      
       setStatus("error");
-      setError(err.message || "Failed to start camera");
+      setError(helpText || errorMessage);
     }
   }, [isOpen]);
 

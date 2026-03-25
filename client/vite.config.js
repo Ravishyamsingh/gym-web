@@ -19,6 +19,14 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       port: 5173,
+      // Configure middleware to properly serve large files
+      middlewareMode: false,
+      // Set proper headers for model files
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        // Disable compression for model files to avoid Content-Length issues
+        "Content-Encoding": "identity",
+      },
       proxy: {
         "/api": {
           target: apiOrigin,
@@ -26,5 +34,18 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
+    // Configure optimizations for large files
+    build: {
+      // Increase chunk size limit to handle large model files better
+      chunkSizeWarningLimit: 10000,
+      // Use rollup option for better handling
+      rollupOptions: {
+        output: {
+          manualChunks: undefined,
+        },
+      },
+    },
+    // Ensure models are served as-is
+    publicDir: "public",
   };
 });

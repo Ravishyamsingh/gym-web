@@ -81,8 +81,19 @@ export default function FaceVerificationFlow({ onAccessGranted, onNeedRegistrati
       );
     } catch (err) {
       console.error("[FaceVerification] Camera init failed:", err);
+      
+      let errorMessage = err.message || "Camera access denied";
+      let helpText = "";
+      
+      // Provide specific help for different error types
+      if (err.message?.includes("model") || err.message?.includes("Models")) {
+        helpText = "Face recognition models failed to load. Please: 1) Clear browser cache, 2) Restart your browser, 3) Check internet connection.";
+      } else if (err.message?.includes("camera") || err.message?.includes("Permission")) {
+        helpText = "Camera access denied. Please check your browser permissions and try again.";
+      }
+      
       setStatus("denied");
-      setError(err.message || "Camera access denied");
+      setError(helpText || errorMessage);
       setShowOtpFallback(true);
     }
   }, [isExitAction]);

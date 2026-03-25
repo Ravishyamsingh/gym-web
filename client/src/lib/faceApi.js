@@ -3,37 +3,87 @@ import * as faceapi from "face-api.js";
 const MODEL_URL = "/models";
 
 let modelsLoaded = false;
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 1000; // ms
+
+/**
+ * Load a single model with retry logic
+ * @param {Function} loader - Model loader function (e.g., faceapi.nets.ssdMobilenetv1.loadFromUri)
+ * @param {string} modelName - Name of the model for logging
+ * @param {number} retries - Current retry count
+ */
+async function loadModelWithRetry(loader, modelName, retries = 0) {
+  try {
+    console.log(`[FaceModels] Loading ${modelName} (attempt ${retries + 1}/${MAX_RETRIES})...`);
+    await loader(MODEL_URL);
+    console.log(`[FaceModels] ✓ ${modelName} loaded successfully`);
+  } catch (err) {
+    console.warn(`[FaceModels] ⚠ ${modelName} load failed:`, err.message);
+    
+    if (retries < MAX_RETRIES - 1) {
+      console.log(`[FaceModels] Retrying ${modelName} in ${RETRY_DELAY}ms...`);
+      await new Promise((r) => setTimeout(r, RETRY_DELAY));
+      return loadModelWithRetry(loader, modelName, retries + 1);
+    }
+    
+    throw new Error(`Failed to load ${modelName} after ${MAX_RETRIES} attempts: ${err.message}`);
+  }
+}
 
 /**
  * Load the three required face-api.js neural network models.
  * Safe to call multiple times — loads only once.
- * Throws a descriptive error if any model file is missing or fails to load.
+ * Includes retry logic for network resilience.
  */
 export async function loadFaceModels() {
-  if (modelsLoaded) return;
+  if (modelsLoaded) {
+    console.log("[FaceModels] Models already loaded, skipping");
+    return;
+  }
 
   try {
-    await Promise.all([
-      faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
-      faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-      faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
-    ]);
+    console.log("[FaceModels] Starting face model initialization...");
+    
+    // Load models sequentially with retry logic to avoid parallel failures
+    await loadModelWithRetry(
+      () => faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
+      "SSD MobileNet v1 (Face Detection)"
+    );
+    
+    await loadModelWithRetry(
+      () => faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+      "Face Landmark 68 (Landmark Detection)"
+    );
+    
+    await loadModelWithRetry(
+      () => faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
+      "Face Recognition Net (Descriptor Extraction)"
+    );
 
     modelsLoaded = true;
-    console.log("✅ face-api.js models loaded");
+    console.log("[FaceModels] ✅ All face-api.js models loaded successfully!");
+    
   } catch (err) {
+    modelsLoaded = false; // Reset flag on failure to allow retry
+    
     // Provide a clear message so developers know which files are expected
     console.error(
-      "❌ Failed to load face-api.js models. Ensure the following files " +
-        "exist inside client/public/models/:\n" +
-        "  - ssd_mobilenetv1_model-weights_manifest.json + shard files\n" +
-        "  - face_landmark_68_model-weights_manifest.json + shard files\n" +
-        "  - face_recognition_model-weights_manifest.json + shard files\n" +
-        "Original error:",
+      "[FaceModels] ❌ Failed to load face-api.js models.\n\n" +
+      "Ensure the following files exist inside client/public/models/:\n" +
+      "  ✓ ssd_mobilenetv1_model-weights_manifest.json + shard1/shard2\n" +
+      "  ✓ face_landmark_68_model-weights_manifest.json + shard1\n" +
+      "  ✓ face_recognition_model-weights_manifest.json + shard1/shard2\n\n" +
+      "Troubleshooting:\n" +
+      "  1. Verify all model files exist in client/public/models/\n" +
+      "  2. Restart the dev server (Ctrl+C, then npm run dev)\n" +
+      "  3. Clear browser cache (F12 > Application > Clear Storage)\n" +
+      "  4. Check if models are being served correctly (Network tab)\n\n" +
+      "Original error:",
       err
     );
+    
     throw new Error(
-      "Face recognition models failed to load. Please check that model files are present in /public/models/."
+      "Face recognition models failed to load. Check console for details."
     );
   }
 }

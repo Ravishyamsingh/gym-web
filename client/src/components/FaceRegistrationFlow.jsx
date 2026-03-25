@@ -34,7 +34,7 @@ export default function FaceRegistrationFlow({ onSuccess, onSkip }) {
 
     try {
       // Load face models first
-      setMessage("Loading face recognition models...");
+      setMessage("Loading face recognition models (this may take 30-60 seconds)...");
       await loadFaceModels();
 
       // Request camera access
@@ -63,9 +63,20 @@ export default function FaceRegistrationFlow({ onSuccess, onSkip }) {
       setMessage("Camera ready. Look directly at the camera and click 'Scan Face' to begin.");
     } catch (err) {
       console.error("[FaceRegistration] Camera initialization failed:", err);
+      
+      let errorMessage = err.message || "Failed to initialize camera";
+      let helpText = "";
+      
+      // Provide specific help for different error types
+      if (err.message?.includes("model") || err.message?.includes("Models")) {
+        helpText = "The face recognition models failed to load. Please try: 1) Clear browser cache (Ctrl+Shift+Delete), 2) Restart your browser, 3) Check your internet connection. Model files should be in /public/models/.";
+      } else if (err.message?.includes("camera") || err.message?.includes("Permission")) {
+        helpText = "Camera access was denied. Please: 1) Check browser permissions for camera access, 2) Reload the page, 3) Try in incognito/private mode if persists.";
+      }
+      
       setStatus("error");
-      setError(err.message || "Failed to initialize camera");
-      setMessage("Camera access denied or unavailable");
+      setError(helpText || errorMessage);
+      setMessage(helpText ? "Setup Error" : "Camera access denied or unavailable");
     }
   }, []);
 
