@@ -103,11 +103,10 @@ async function createRazorpayOrder({ userId, planId, amount }) {
     throw new Error("userId, planId, and amount are required");
   }
 
-  // Verify amount matches plan
-  const expectedAmount = getPlanPrice(planId);
-  if (amount !== expectedAmount) {
+  // Validate amount is positive and >= ₹1
+  if (amount < 100) {
     throw new Error(
-      `Amount mismatch. Expected ${expectedAmount} paise, got ${amount}`
+      `Invalid amount: ${amount} paise. Minimum is 100 paise (₹1)`
     );
   }
 
