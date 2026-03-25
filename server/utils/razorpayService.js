@@ -118,6 +118,8 @@ async function createRazorpayOrder({ userId, planId, amount }) {
   try {
     // Create order on Razorpay
     const instance = getRazorpayInstance();
+    console.log(`[Razorpay] Creating order with amount: ${amount} paise (₹${amount/100})`);
+    
     const order = await instance.orders.create({
       amount, // In paise
       currency: "INR",
@@ -134,8 +136,17 @@ async function createRazorpayOrder({ userId, planId, amount }) {
 
     return order;
   } catch (err) {
+    console.error("❌ Razorpay API Error:");
+    console.error(`   Status: ${err.statusCode || 'Unknown'}`);
+    console.error(`   Code: ${err.code || 'Unknown'}`);
+    
     const errMsg = err?.error?.description || err?.description || err?.message || JSON.stringify(err);
-    console.error("❌ Error creating Razorpay order:", errMsg);
+    console.error(`   Message: ${errMsg}`);
+    
+    if (err?.response?.data) {
+      console.error(`   Response: ${JSON.stringify(err.response.data)}`);
+    }
+    
     throw new Error(`Failed to create payment order: ${errMsg}`);
   }
 }

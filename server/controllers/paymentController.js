@@ -200,6 +200,24 @@ exports.createOrder = async (req, res, next) => {
     const userId = req.dbUser._id;
     const user = req.dbUser;
 
+    console.log("\n" + "=".repeat(70));
+    console.log("📝 CREATE ORDER REQUEST");
+    console.log("=".repeat(70));
+    console.log(`User: ${user.email} (${userId})`);
+    console.log(`Plan: ${planId}`);
+
+    // Check Razorpay credentials
+    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+      console.error("❌ RAZORPAY CREDENTIALS NOT FOUND");
+      console.error(`   RAZORPAY_KEY_ID: ${process.env.RAZORPAY_KEY_ID ? '✅' : '❌'}`);
+      console.error(`   RAZORPAY_KEY_SECRET: ${process.env.RAZORPAY_KEY_SECRET ? '✅' : '❌'}`);
+      return res.status(500).json({
+        error: "Payment gateway not configured",
+        message: "Razorpay credentials are missing. Contact support.",
+        details: "RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET not set in environment"
+      });
+    }
+
     // ─────────────────────────────────────────────────────────────
     // Validate plan
     // ─────────────────────────────────────────────────────────────
@@ -252,7 +270,13 @@ exports.createOrder = async (req, res, next) => {
         "1year": "1 Year",
       };
       duration = durationMap[planId];
+      
+      console.log(`First-time user: ${isFirstTimeUser}`);
+      console.log(`Amount: ₹${amount/100} (${amount} paise)`);
+      console.log(`Membership fee: ₹${membershipFeeAmount/100}`);
+      console.log(`Registration fee: ₹${registrationFeeAmount/100}`);
     } catch (err) {
+      console.error("❌ Amount calculation failed:", err.message);
       return res.status(400).json({ error: err.message });
     }
 
@@ -273,15 +297,19 @@ exports.createOrder = async (req, res, next) => {
     // ─────────────────────────────────────────────────────────────
     let razorpayOrder;
     try {
+      console.log("🔗 Creating Razorpay order...");
       razorpayOrder = await createRazorpayOrder({
         userId: userId.toString(),
         planId,
         amount,
       });
+      console.log(`✅ Razorpay order created: ${razorpayOrder.id}`);
     } catch (err) {
+      console.error("❌ Razorpay order creation failed:", err.message);
       return res.status(500).json({
         error: "Failed to create payment order",
         message: err.message,
+        details: err.response?.data || err.toString()
       });
     }
 
@@ -304,8 +332,7 @@ exports.createOrder = async (req, res, next) => {
       membershipFeeAmount: membershipFeeAmount / 100, // Convert to rupees
     });
 
-    console.log(`📋 Payment record created: ${payment._id}`);
-    console.log(`📊 Razorpay order created: ${razorpayOrder.id}`);
+    console.log(`✅ Payment record created: ${payment._id}`);
 
     // ─────────────────────────────────────────────────────────────
     // Generate Razorpay checkout configuration
@@ -321,6 +348,7 @@ exports.createOrder = async (req, res, next) => {
     // ─────────────────────────────────────────────────────────────
     // Return order details to frontend
     // ─────────────────────────────────────────────────────────────
+    console.log("=".repeat(70) + "\n");
     return res.status(201).json({
       orderId: razorpayOrder.id,
       amount, // in paise
@@ -339,6 +367,7 @@ exports.createOrder = async (req, res, next) => {
     });
   } catch (err) {
     console.error("❌ Error creating order:", err.message);
+    console.error(err);
     next(err);
   }
 };
