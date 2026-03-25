@@ -6,6 +6,7 @@ const connectDB = require("./config/db");
 // ── Route imports ──────────────────
 const authRoutes = require("./routes/auth");
 const userRoutes = require("./routes/users");
+const faceRoutes = require("./routes/face");
 const attendanceRoutes = require("./routes/attendance");
 const paymentRoutes = require("./routes/payments");
 const webhookRoutes = require("./routes/webhooks");
@@ -123,6 +124,7 @@ app.get("/api/health", (_req, res) => res.json({ status: "ok", ts: Date.now() })
 // ── API routes ──────────────────────────────
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/face", faceRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/webhooks", webhookRoutes);

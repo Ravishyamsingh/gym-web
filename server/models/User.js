@@ -82,11 +82,46 @@ const userSchema = new mongoose.Schema(
     faceRegistered: {
       type: Boolean,
       default: false,
+      index: true,
     },
     // 128-dimensional Float32 array for face recognition
     faceDescriptor: {
       type: [Number],
       default: [],
+    },
+    // Profile picture - Base64 encoded image stored securely
+    // Captured during first face registration and locked after that
+    profilePicture: {
+      type: String,
+      default: null,
+      description: "Base64 encoded profile picture (JPEG), captured during face registration",
+    },
+    // Timestamp of first face registration
+    faceRegisteredAt: {
+      type: Date,
+      default: null,
+      index: true,
+      description: "When user completed their first face registration, never changed",
+    },
+    // Track if user has completed face registration during onboarding
+    // Set to true on first successful registration, determines flow
+    faceRegistrationCompleted: {
+      type: Boolean,
+      default: false,
+      index: true,
+      description: "Marks if user has completed initial face registration during onboarding",
+    },
+    // Number of times user has re-registered their face (initial registration = 0)
+    faceReregistrationCount: {
+      type: Number,
+      default: 0,
+      description: "Tracks how many times user has re-registered/updated their face",
+    },
+    // Last re-registration timestamp
+    faceLastReregisteredAt: {
+      type: Date,
+      default: null,
+      description: "When user last re-registered their face (after initial registration)",
     },
     // Authentication provider
     authProvider: {

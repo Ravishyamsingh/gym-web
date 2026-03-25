@@ -214,6 +214,13 @@ exports.login = async (req, res, next) => {
       });
     }
 
+    // Assign userId if user doesn't have one (legacy users)
+    if (!user.userId) {
+      user.userId = await generateNextUserId();
+      await user.save();
+      console.log(`[LOGIN] Assigned userId to legacy user: ${user.email} -> ${user.userId}`);
+    }
+
     console.log(`[LOGIN] Successful login: ${user.email}`);
 
     // Generate JWT token for password-based auth
@@ -300,8 +307,12 @@ exports.firebaseRegister = async (req, res, next) => {
       });
     }
 
+    // Auto-generate numeric user ID for Firebase users
+    const generatedUserId = await generateNextUserId();
+
     const user = new User({
       firebaseId: decoded.uid,
+      userId: generatedUserId,
       name,
       email: email.toLowerCase(),
       faceDescriptor: faceDescriptor || [],
@@ -343,7 +354,7 @@ exports.firebaseLogin = async (req, res, next) => {
       });
     }
 
-    const user = await User.findOne({ firebaseId: decoded.uid });
+    let user = await User.findOne({ firebaseId: decoded.uid });
 
     if (!user) {
       console.warn(
@@ -353,6 +364,13 @@ exports.firebaseLogin = async (req, res, next) => {
         error:
           "User not found — please complete registration first",
       });
+    }
+
+    // Assign userId if user doesn't have one (legacy users)
+    if (!user.userId) {
+      user.userId = await generateNextUserId();
+      await user.save();
+      console.log(`[FIREBASE-LOGIN] Assigned userId to legacy user: ${user.email} -> ${user.userId}`);
     }
 
     console.log(`[FIREBASE-LOGIN] Successful: ${user.email}`);
@@ -394,6 +412,13 @@ exports.googleAuth = async (req, res, next) => {
     let user = await User.findOne({ firebaseId: decoded.uid });
 
     if (user) {
+      // Assign userId if user doesn't have one (legacy users)
+      if (!user.userId) {
+        user.userId = await generateNextUserId();
+        await user.save();
+        console.log(`[GOOGLE-AUTH] Assigned userId to legacy user: ${user.email} -> ${user.userId}`);
+      }
+
       console.log(`[GOOGLE-AUTH] Existing user: ${user.email}`);
       const profileComplete =
         user.faceRegistered === true &&
@@ -432,8 +457,12 @@ exports.googleAuth = async (req, res, next) => {
       });
     }
 
+    // Auto-generate numeric user ID for new Google users
+    const generatedUserId = await generateNextUserId();
+
     user = new User({
       firebaseId: decoded.uid,
+      userId: generatedUserId,
       name: displayName,
       email: userEmail,
       authProvider: "google",
