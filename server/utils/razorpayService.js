@@ -15,17 +15,31 @@ const Razorpay = require("razorpay");
 const { v4: uuidv4 } = require("uuid");
 
 // ─────────────────────────────────────────────────────────────────
-// Initialize Razorpay Instance
+// Lazy Initialize Razorpay Instance
+// Deferred until first use to ensure env vars are loaded
 // ─────────────────────────────────────────────────────────────────
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET,
-});
+let razorpay = null;
+
+function getRazorpayInstance() {
+  if (!razorpay) {
+    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+      throw new Error(
+        "❌ Missing Razorpay credentials: RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET must be set in .env"
+      );
+    }
+    razorpay = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
+    });
+    console.log("✅ Razorpay instance initialized");
+  }
+  return razorpay;
+}
 
 // ─────────────────────────────────────────────────────────────────
 // Plan Prices (in paise — multiply INR by 100)
 // ─────────────────────────────────────────────────────────────────
-const REGISTRATION_FEE = 80000; // ₹800 for first-time users only
+const REGISTRATION_FEE = 1000; // ₹10 for first-time users only
 const PLAN_PRICES = {
   "1month": 100, // ₹1 (Testing - change back to 60000 for ₹600 after testing)
   "6months": 300000, // ₹3000
@@ -48,7 +62,7 @@ function getPlanPrice(planId) {
 
 /**
  * Calculate total payment amount for a user
- * If user hasn't paid registration fee, add ₹800 to plan price
+ * If user hasn't paid registration fee, add ₹10 to plan price
  * @param {string} planId - Plan identifier
  * @param {boolean} isFirstTimeUser - Whether user has paid registration fee
  * @returns {Object} { totalAmount, planAmount, registrationFeeAmount, includesRegistrationFee }
@@ -103,7 +117,8 @@ async function createRazorpayOrder({ userId, planId, amount }) {
 
   try {
     // Create order on Razorpay
-    const order = await razorpay.orders.create({
+    const instance = getRazorpayInstance();
+    const order = await instance.orders.create({
       amount, // In paise
       currency: "INR",
       receipt, // Unique receipt ID
@@ -218,7 +233,8 @@ function verifyWebhookSignature(body, signature) {
  */
 async function fetchPaymentDetails(paymentId) {
   try {
-    const payment = await razorpay.payments.fetch(paymentId);
+    const instance = getRazorpayInstance();
+    const payment = await instance.payments.fetch(paymentId);
     return payment;
   } catch (err) {
     console.error(`Error fetching payment ${paymentId}:`, err.message);
@@ -234,7 +250,8 @@ async function fetchPaymentDetails(paymentId) {
  */
 async function fetchOrderDetails(orderId) {
   try {
-    const order = await razorpay.orders.fetch(orderId);
+    const instance = getRazorpayInstance();
+    const order = await instance.orders.fetch(orderId);
     return order;
   } catch (err) {
     console.error(`Error fetching order ${orderId}:`, err.message);
@@ -361,7 +378,7 @@ function extractPaymentInfo(payment) {
 }
 
 module.exports = {
-  razorpay,
+  getRazorpayInstance,
   getPlanPrice,
   calculatePaymentAmount,
   createRazorpayOrder,

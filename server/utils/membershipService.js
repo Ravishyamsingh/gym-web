@@ -7,7 +7,7 @@ const Payment = require("../models/Payment");
  * Handles membership management, fee calculation, and history tracking
  */
 
-const REGISTRATION_FEE = 800; // ₹800
+const REGISTRATION_FEE = 10; // ₹10
 
 // Plan details: { duration in months, price in ₹ }
 const PLANS = {

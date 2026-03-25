@@ -52,7 +52,7 @@ export default function MembershipPage() {
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [showCheckout, setShowCheckout] = useState(false);
 
-  const REGISTRATION_FEE = 800; // First-time registration fee
+  const REGISTRATION_FEE = 10; // First-time registration fee
   
   // Helper function to get combined price for first-time users
   const getDisplayPrice = () => {
@@ -142,7 +142,7 @@ export default function MembershipPage() {
                     </div>
                     {isFirstTimeUser && (
                       <p className="text-xs text-white/50 mb-2">
-                        (₹{plan.price.toLocaleString("en-IN")} plan + ₹800 registration)
+                        (₹{plan.price.toLocaleString("en-IN")} plan + ₹{REGISTRATION_FEE} registration)
                       </p>
                     )}
                     <p className="text-sm text-white/50 mb-3">
@@ -211,7 +211,7 @@ export default function MembershipPage() {
                     </div>
                     <div className="flex justify-between text-white/70">
                       <span>Registration Fee</span>
-                      <span>₹800</span>
+                      <span>₹{REGISTRATION_FEE}</span>
                     </div>
                     <div className="border-t border-white/20 pt-2 mt-2 flex justify-between font-bold text-white">
                       <span>Total Amount</span>

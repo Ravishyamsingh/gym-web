@@ -41,7 +41,7 @@ const membershipHistorySchema = new mongoose.Schema(
     registrationFeeAmount: {
       type: Number,
       default: 0,
-      description: "Registration fee amount if applicable (₹800)",
+      description: "Registration fee amount if applicable (₹10)",
     },
     totalAmount: {
       type: Number,
