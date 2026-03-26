@@ -352,8 +352,16 @@ export default function UserDashboard() {
                 {/* Top row: Avatar + Name/Info + Badge — all vertically centred */}
                 <div className="flex items-center gap-4">
                   {/* Avatar */}
-                  <div className="h-14 w-14 sm:h-16 sm:w-16 rounded-full bg-gradient-to-br from-blood to-blood/60 flex items-center justify-center text-white text-xl sm:text-2xl font-bold font-display shadow-lg shadow-blood/20 border-4 border-surface shrink-0">
-                    {(dbUser?.name || "?")[0].toUpperCase()}
+                  <div className="h-14 w-14 sm:h-16 sm:w-16 rounded-full bg-gradient-to-br from-blood to-blood/60 flex items-center justify-center text-white text-xl sm:text-2xl font-bold font-display shadow-lg shadow-blood/20 border-4 border-surface shrink-0 overflow-hidden">
+                    {dbUser?.profilePicture ? (
+                      <img 
+                        src={dbUser.profilePicture} 
+                        alt={dbUser?.name} 
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      (dbUser?.name || "?")[0].toUpperCase()
+                    )}
                   </div>
                   {/* Name + meta */}
                   <div className="flex-1 min-w-0">

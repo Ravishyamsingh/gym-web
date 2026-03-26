@@ -80,8 +80,16 @@ export default function AccountDropdown({ inGymStatus }) {
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-white/5 transition-colors"
       >
-        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blood/20 border border-blood/40">
-          <User size={18} className="text-blood" />
+        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blood/20 border border-blood/40 overflow-hidden">
+          {dbUser?.profilePicture ? (
+            <img 
+              src={dbUser.profilePicture} 
+              alt="Profile" 
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <User size={18} className="text-blood" />
+          )}
         </div>
         <ChevronDown
           size={16}
@@ -102,8 +110,16 @@ export default function AccountDropdown({ inGymStatus }) {
             {/* Header Section */}
             <div className="bg-gradient-to-r from-blood/10 to-blood/5 px-6 py-5 border-b border-white/5">
               <div className="flex items-center gap-3 mb-4">
-                <div className="flex items-center justify-center w-12 h-12 rounded-full bg-blood/20 border border-blood/40">
-                  <User size={24} className="text-blood" />
+                <div className="flex items-center justify-center w-12 h-12 rounded-full bg-blood/20 border border-blood/40 overflow-hidden flex-shrink-0">
+                  {dbUser?.profilePicture ? (
+                    <img 
+                      src={dbUser.profilePicture} 
+                      alt="Profile" 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <User size={24} className="text-blood" />
+                  )}
                 </div>
                 <div className="flex-1">
                   <h3 className="text-lg font-bold text-light leading-tight">
