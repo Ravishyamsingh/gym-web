@@ -448,13 +448,48 @@ exports.googleAuth = async (req, res, next) => {
 
     const existingEmail = await User.findOne({ email: userEmail });
     if (existingEmail) {
-      console.warn(
-        `[GOOGLE-AUTH] Email already registered: ${userEmail}`
-      );
-      return res.status(409).json({
-        error:
-          "Email already registered with another account. Please login instead.",
-      });
+      // Check if the existing email record has a firebaseId from another account
+      if (existingEmail.firebaseId && existingEmail.firebaseId !== decoded.uid) {
+        console.warn(
+          `[GOOGLE-AUTH] Email already registered with different Firebase account: ${userEmail}`
+        );
+        return res.status(409).json({
+          error:
+            "Email already registered with another account. Please login instead.",
+        });
+      }
+
+      // Handle orphaned email record (no firebaseId)
+      // This happens when user was previously deleted but email record remains
+      if (!existingEmail.firebaseId) {
+        console.log(
+          `[GOOGLE-AUTH] Recovering orphaned email record: ${userEmail}`
+        );
+        // Update the existing orphaned record with Google firebaseId
+        existingEmail.firebaseId = decoded.uid;
+        existingEmail.name = displayName;
+        existingEmail.authProvider = "google";
+        if (!existingEmail.userId) {
+          existingEmail.userId = await generateNextUserId();
+        }
+        await existingEmail.save();
+
+        const profileComplete =
+          existingEmail.faceRegistered === true &&
+          existingEmail.paymentStatus === "active";
+
+        console.log(
+          `[GOOGLE-AUTH] Recovered user: ${userEmail} with Firebase UID: ${decoded.uid}`
+        );
+
+        return res.status(200).json({
+          message: "Account recovered successfully",
+          user: existingEmail,
+          profileComplete,
+          isNewUser: false,
+          isRecovered: true,
+        });
+      }
     }
 
     // Auto-generate numeric user ID for new Google users
