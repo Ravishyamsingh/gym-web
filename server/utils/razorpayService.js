@@ -39,9 +39,10 @@ function getRazorpayInstance() {
 // ─────────────────────────────────────────────────────────────────
 // Plan Prices (in paise — multiply INR by 100)
 // ─────────────────────────────────────────────────────────────────
-const REGISTRATION_FEE = 1000; // ₹10 for first-time users only
+const REGISTRATION_FEE = 80000; // ₹800 for first-time users only
 const PLAN_PRICES = {
-  "1month": 100, // ₹1 (Testing - change back to 60000 for ₹600 after testing)
+  "1month": 60000, // ₹600
+  "3months": 150000, // ₹1500
   "6months": 300000, // ₹3000
   "1year": 540000, // ₹5400
 };

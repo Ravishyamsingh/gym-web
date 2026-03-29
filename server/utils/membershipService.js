@@ -7,11 +7,12 @@ const Payment = require("../models/Payment");
  * Handles membership management, fee calculation, and history tracking
  */
 
-const REGISTRATION_FEE = 10; // ₹10
+const REGISTRATION_FEE = 800; // ₹800
 
 // Plan details: { duration in months, price in ₹ }
 const PLANS = {
   "1month": { months: 1, price: 600 },
+  "3months": { months: 3, price: 1500 },
   "6months": { months: 6, price: 3000 },
   "1year": { months: 12, price: 5400 },
 };
@@ -36,7 +37,7 @@ async function isFirstTimeUser(userId) {
 /**
  * Calculate membership amount with registration fee if applicable
  *
- * @param {String} planId - Plan ID (1month, 6months, 1year)
+ * @param {String} planId - Plan ID (1month, 3months, 6months, 1year)
  * @param {ObjectId} userId - User ID
  * @returns {Promise<Object>} - {
  *   planAmount, registrationFeeAmount, totalAmount, includesRegistrationFee, isFirstTimeUser
@@ -87,7 +88,7 @@ function calculateExpiryDate(planId, startDate = new Date()) {
  * Creates audit trail in MembershipHistory
  *
  * @param {ObjectId} userId - User ID
- * @param {String} planId - Plan ID (1month, 6months, 1year)
+ * @param {String} planId - Plan ID (1month, 3months, 6months, 1year)
  * @param {ObjectId} adminId - Admin ID who performed the action (null if system)
  * @param {Object} options - Additional options
  *   - reason: String (reason for change)
@@ -253,6 +254,7 @@ async function getPlanDistribution(status = "active") {
   // Get historical distribution from Payment records (actual revenue)
   const distribution = {
     "1month": { count: 0, totalRevenue: 0, expiringSoon: 0 },
+    "3months": { count: 0, totalRevenue: 0, expiringSoon: 0 },
     "6months": { count: 0, totalRevenue: 0, expiringSoon: 0 },
     "1year": { count: 0, totalRevenue: 0, expiringSoon: 0 },
   };

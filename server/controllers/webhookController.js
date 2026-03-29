@@ -34,7 +34,7 @@ const {
 const logger = new Logger("WebhookController");
 
 // Valid membership plan IDs
-const VALID_PLAN_IDS = ["1month", "6months", "1year"];
+const VALID_PLAN_IDS = ["1month", "3months", "6months", "1year"];
 // Transaction timeout in milliseconds (30 seconds)
 const TRANSACTION_TIMEOUT = 30000;
 

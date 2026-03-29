@@ -97,7 +97,7 @@ const getPlanDistribution = async (req, res) => {
  *   page: Number (1-indexed),
  *   limit: Number (default 20),
  *   status?: String (active, pending, expired)
- *   planId?: String (1month, 6months, 1year)
+ *   planId?: String (1month, 3months, 6months, 1year)
  *   sortBy?: String (createdAt, totalAmount)
  *   order?: String (asc, desc)
  * }

@@ -50,6 +50,7 @@ function CountUp({ to, duration = 1.5 }) {
 
 function formatPlanName(plan) {
   if (plan === "1month") return "1 Month";
+  if (plan === "3months") return "3 Months";
   if (plan === "6months") return "6 Months";
   if (plan === "1year") return "1 Year";
   return "—";

@@ -20,6 +20,7 @@ export default function MembershipDialog({
 
   const plans = [
     { id: "1month", label: "1 Month", duration: "1 month" },
+    { id: "3months", label: "3 Months", duration: "3 months" },
     { id: "6months", label: "6 Months", duration: "6 months" },
     { id: "1year", label: "12 Months", duration: "12 months" },
   ];

@@ -9,12 +9,24 @@ const MEMBERSHIP_PLANS = [
   {
     id: "1month",
     duration: "1 Month",
-    price: 1, // Testing mode - change back to 600 for production
+    price: 600,
     description: "Perfect for trying out the gym experience",
     features: [
       "Unlimited gym access",
       "Access to all equipment",
       "Basic support",
+    ],
+  },
+  {
+    id: "3months",
+    duration: "3 Months",
+    price: 1500,
+    description: "Great for getting into a fitness routine",
+    features: [
+      "Unlimited gym access",
+      "Access to all equipment",
+      "Priority support",
+      "Monthly fitness report",
     ],
   },
   {
@@ -52,7 +64,7 @@ export default function MembershipPage() {
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [showCheckout, setShowCheckout] = useState(false);
 
-  const REGISTRATION_FEE = 10; // First-time registration fee
+  const REGISTRATION_FEE = 800; // First-time registration fee
   
   // Helper function to get combined price for first-time users
   const getDisplayPrice = () => {

@@ -210,11 +210,12 @@ export default function AdminRevenue() {
         <Card>
           <CardContent className="p-6">
             <h2 className="font-bold text-light mb-4">Plan-wise Distribution</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {["1month", "6months", "1year"].map((plan) => {
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              {["1month", "3months", "6months", "1year"].map((plan) => {
                 const data = distribution?.distribution[plan] || {};
                 const planNames = {
                   "1month": "1 Month",
+                  "3months": "3 Months",
                   "6months": "6 Months",
                   "1year": "12 Months",
                 };

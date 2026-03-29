@@ -178,7 +178,7 @@ exports.getStats = async (_req, res, next) => {
  *
  * Request body:
  * {
- *   planId: "1month" | "6months" | "1year"
+ *   planId: "1month" | "3months" | "6months" | "1year"
  * }
  *
  * Response:
@@ -221,10 +221,10 @@ exports.createOrder = async (req, res, next) => {
     // ─────────────────────────────────────────────────────────────
     // Validate plan
     // ─────────────────────────────────────────────────────────────
-    if (!planId || !["1month", "6months", "1year"].includes(planId)) {
+    if (!planId || !["1month", "3months", "6months", "1year"].includes(planId)) {
       return res
         .status(400)
-        .json({ error: "Invalid planId. Must be 1month, 6months, or 1year" });
+        .json({ error: "Invalid planId. Must be 1month, 3months, 6months, or 1year" });
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -247,6 +247,7 @@ exports.createOrder = async (req, res, next) => {
 
     // ─────────────────────────────────────────────────────────────
     // Calculate payment amount (with registration fee for first-time users)
+    // Check if user already has membership history (renewal vs new)
     // ─────────────────────────────────────────────────────────────
     let amount;
     let duration;
@@ -255,7 +256,12 @@ exports.createOrder = async (req, res, next) => {
     let membershipFeeAmount;
     
     try {
-      const isFirstTimeUser = !user.registrationFeePaid;
+      // Check if user has ever had a membership (for renewal detection)
+      const MembershipHistory = require("../models/MembershipHistory");
+      const membershipHistory = await MembershipHistory.findOne({ userId });
+      
+      // User is "first-time" if they have NO membership history AND registration fee not paid
+      const isFirstTimeUser = !membershipHistory && !user.registrationFeePaid;
       const paymentDetails = calculatePaymentAmount(planId, isFirstTimeUser);
       
       amount = paymentDetails.totalAmount;
@@ -266,12 +272,14 @@ exports.createOrder = async (req, res, next) => {
       // Map planId to duration string
       const durationMap = {
         "1month": "1 Month",
+        "3months": "3 Months",
         "6months": "6 Months",
         "1year": "1 Year",
       };
       duration = durationMap[planId];
       
       console.log(`First-time user: ${isFirstTimeUser}`);
+      console.log(`Has membership history: ${!!membershipHistory}`);
       console.log(`Amount: ₹${amount/100} (${amount} paise)`);
       console.log(`Membership fee: ₹${membershipFeeAmount/100}`);
       console.log(`Registration fee: ₹${registrationFeeAmount/100}`);
@@ -286,6 +294,8 @@ exports.createOrder = async (req, res, next) => {
     const expiryDate = new Date();
     if (planId === "1month") {
       expiryDate.setMonth(expiryDate.getMonth() + 1);
+    } else if (planId === "3months") {
+      expiryDate.setMonth(expiryDate.getMonth() + 3);
     } else if (planId === "6months") {
       expiryDate.setMonth(expiryDate.getMonth() + 6);
     } else if (planId === "1year") {
@@ -362,7 +372,7 @@ exports.createOrder = async (req, res, next) => {
       registrationFeeAmount: registrationFeeAmount / 100,
       membershipFeeAmount: membershipFeeAmount / 100,
       message: includesRegistrationFee 
-        ? "First-time payment includes ₹10 registration fee + membership plan amount"
+        ? "First-time payment includes ₹800 registration fee + membership plan amount"
         : "Order created. Proceed to payment.",
     });
   } catch (err) {

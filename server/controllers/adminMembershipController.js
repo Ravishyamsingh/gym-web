@@ -48,7 +48,7 @@ const updateMembership = async (req, res) => {
 
     if (planId && !membershipService.PLANS[planId]) {
       return res.status(400).json({
-        error: `Invalid plan ID: ${planId}. Must be one of: 1month, 6months, 1year`,
+        error: `Invalid plan ID: ${planId}. Must be one of: 1month, 3months, 6months, 1year`,
       });
     }
 

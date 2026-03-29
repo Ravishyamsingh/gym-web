@@ -26,7 +26,7 @@ const membershipHistorySchema = new mongoose.Schema(
     },
     membershipPlan: {
       type: String,
-      enum: ["1month", "6months", "1year"],
+      enum: ["1month", "3months", "6months", "1year"],
       required: true,
     },
     planAmount: {

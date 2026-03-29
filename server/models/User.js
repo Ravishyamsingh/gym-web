@@ -67,7 +67,7 @@ const userSchema = new mongoose.Schema(
     // Membership details
     membershipPlan: {
       type: String,
-      enum: ["1month", "6months", "1year", null],
+      enum: ["1month", "3months", "6months", "1year", null],
       default: null,
     },
     membershipStartDate: {
