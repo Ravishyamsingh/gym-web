@@ -22,6 +22,10 @@ if (!process.env.JWT_SECRET) {
 // ── Initialise app ─────────────────────────
 const app = express();
 
+// Trust proxy for rate limiting and X-Forwarded-For headers (important for deployment on Render/Heroku)
+// This tells Express to trust X-Forwarded-For header from reverse proxy
+app.set('trust proxy', 1);
+
 function normalizeOrigin(input) {
   const raw = String(input || "").trim();
   if (!raw) return "";

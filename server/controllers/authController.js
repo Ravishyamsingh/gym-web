@@ -448,24 +448,28 @@ exports.googleAuth = async (req, res, next) => {
 
     const existingEmail = await User.findOne({ email: userEmail });
     if (existingEmail) {
-      // Check if the existing email record has a firebaseId from another account
-      if (existingEmail.firebaseId && existingEmail.firebaseId !== decoded.uid) {
-        console.warn(
-          `[GOOGLE-AUTH] Email already registered with different Firebase account: ${userEmail}`
-        );
-        return res.status(409).json({
-          error:
-            "Email already registered with another account. Please login instead.",
+      // Case 1: Email exists with a firebaseId that matches → should have been found in first check
+      // This shouldn't happen given the logic above, but check anyway
+      if (existingEmail.firebaseId === decoded.uid) {
+        console.log(`[GOOGLE-AUTH] Email has correct firebaseId, allowing login`);
+        const profileComplete =
+          existingEmail.faceRegistered === true &&
+          existingEmail.paymentStatus === "active";
+
+        return res.status(200).json({
+          message: "Login successful",
+          user: existingEmail,
+          profileComplete,
+          isNewUser: false,
         });
       }
 
-      // Handle orphaned email record (no firebaseId)
-      // This happens when user was previously deleted but email record remains
+      // Case 2: Email exists but has NO firebaseId or is from password auth
+      // → Recover and link it to Google account
       if (!existingEmail.firebaseId) {
         console.log(
           `[GOOGLE-AUTH] Recovering orphaned email record: ${userEmail}`
         );
-        // Update the existing orphaned record with Google firebaseId
         existingEmail.firebaseId = decoded.uid;
         existingEmail.name = displayName;
         existingEmail.authProvider = "google";
@@ -484,6 +488,44 @@ exports.googleAuth = async (req, res, next) => {
 
         return res.status(200).json({
           message: "Account recovered successfully",
+          user: existingEmail,
+          profileComplete,
+          isNewUser: false,
+          isRecovered: true,
+        });
+      }
+
+      // Case 3: Email exists with a DIFFERENT firebaseId
+      // This means it's previously registered with another Google account
+      // Allow re-linking if user consent is implied (they're trying to sign in)
+      if (existingEmail.firebaseId && existingEmail.firebaseId !== decoded.uid) {
+        console.log(
+          `[GOOGLE-AUTH] Email has different firebaseId, updating link: ${userEmail}`
+        );
+        console.log(
+          `[GOOGLE-AUTH] Old Firebase UID: ${existingEmail.firebaseId}, New: ${decoded.uid}`
+        );
+        
+        // Update the record to link to the new Google account
+        // (User is trying to sign in, so they consent to this change)
+        existingEmail.firebaseId = decoded.uid;
+        existingEmail.name = displayName;
+        existingEmail.authProvider = "google";
+        if (!existingEmail.userId) {
+          existingEmail.userId = await generateNextUserId();
+        }
+        await existingEmail.save();
+
+        const profileComplete =
+          existingEmail.faceRegistered === true &&
+          existingEmail.paymentStatus === "active";
+
+        console.log(
+          `[GOOGLE-AUTH] Linked email to new Google account: ${userEmail}`
+        );
+
+        return res.status(200).json({
+          message: "Account linked successfully",
           user: existingEmail,
           profileComplete,
           isNewUser: false,
