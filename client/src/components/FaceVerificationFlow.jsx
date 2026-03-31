@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/Button";
@@ -32,13 +32,31 @@ export default function FaceVerificationFlow({ onAccessGranted, onNeedRegistrati
   const action = searchParams.get("action") === "exit" ? "exit" : "entry";
   const isExitAction = action === "exit";
 
+  // Check if user has active membership (both status and expiry date)
+  const hasActiveMembership = useMemo(() => {
+    if (!dbUser) return false;
+    if (dbUser.paymentStatus !== "active") return false;
+    if (!dbUser.membershipExpiry) return false;
+    // Check if membership has not expired
+    return new Date(dbUser.membershipExpiry) > new Date();
+  }, [dbUser]);
+
+  const membershipExpired = useMemo(() => {
+    if (!dbUser?.membershipExpiry) return false;
+    return new Date(dbUser.membershipExpiry) <= new Date();
+  }, [dbUser?.membershipExpiry]);
+
   // ── Check if user has face registered ──
   useEffect(() => {
     if (!dbUser?.faceRegistrationCompleted) {
       setStatus("needs-registration");
       setMessage("Face not registered. Please complete face registration first.");
+    } else if (membershipExpired) {
+      setStatus("denied");
+      setMessage("Your membership is not active.");
+      setError(`Your membership expired on ${new Date(dbUser.membershipExpiry).toLocaleDateString()}. Please renew your membership to continue.`);
     }
-  }, [dbUser?.faceRegistrationCompleted]);
+  }, [dbUser?.faceRegistrationCompleted, membershipExpired, dbUser?.membershipExpiry]);
 
   // ── Initialize camera and load models ──
   const initializeCamera = useCallback(async () => {
@@ -165,7 +183,11 @@ export default function FaceVerificationFlow({ onAccessGranted, onNeedRegistrati
         return;
       }
 
-      if (errorData.code === "FACE_MISMATCH") {
+      if (errorData.code === "MEMBERSHIP_EXPIRED" || errorData.code === "PAYMENT_INACTIVE") {
+        setStatus("denied");
+        setMessage("Your membership is not active.");
+        setError("Please renew your membership to access the gym.");
+      } else if (errorData.code === "FACE_MISMATCH") {
         setMatchScore(Math.round(errorData.confidence || 0));
         setStatus("denied");
         setMessage("Face does not match. Access denied.");

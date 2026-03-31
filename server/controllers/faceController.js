@@ -151,6 +151,23 @@ exports.verifyFace = async (req, res, next) => {
       });
     }
 
+    // Check if user's membership is active (not expired)
+    if (req.dbUser.membershipExpiry && new Date() > new Date(req.dbUser.membershipExpiry)) {
+      return res.status(403).json({
+        error: "Your membership is not active.",
+        code: "MEMBERSHIP_EXPIRED",
+        membershipExpiry: req.dbUser.membershipExpiry,
+      });
+    }
+
+    // Check if user's payment status is active
+    if (req.dbUser.paymentStatus !== "active") {
+      return res.status(403).json({
+        error: "Your membership is not active.",
+        code: "PAYMENT_INACTIVE",
+      });
+    }
+
     // Get stored descriptor
     const storedDescriptor = req.dbUser.faceDescriptor;
     if (!isValidFaceDescriptor(storedDescriptor)) {

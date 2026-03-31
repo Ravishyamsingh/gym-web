@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import UserLayout from "@/components/layout/UserLayout";
@@ -40,8 +40,20 @@ export default function VerifyFace() {
     setFallbackEmail(dbUser?.email || "");
   }, [dbUser?.email]);
 
-  // Check if user has active membership
-  const hasActiveMembership = dbUser?.paymentStatus === "active";
+  // Check if user has active membership (both status and expiry date)
+  const hasActiveMembership = useMemo(() => {
+    if (!dbUser) return false;
+    if (dbUser.paymentStatus !== "active") return false;
+    if (!dbUser.membershipExpiry) return false;
+    // Check if membership has not expired
+    return new Date(dbUser.membershipExpiry) > new Date();
+  }, [dbUser]);
+
+  const membershipExpired = useMemo(() => {
+    if (!dbUser?.membershipExpiry) return false;
+    return new Date(dbUser.membershipExpiry) <= new Date();
+  }, [dbUser?.membershipExpiry]);
+
   const isFaceRegistered = dbUser?.faceRegistered === true;
 
   // ── Fetch stored descriptor from server (fresh copy) ─────
@@ -283,7 +295,18 @@ export default function VerifyFace() {
         </p>
 
         {/* Membership check */}
-        {!isExitAction && !hasActiveMembership && (
+        {membershipExpired && (
+          <div className="rounded-xl border border-blood/30 bg-blood/10 px-6 py-4">
+            <p className="text-sm text-blood font-semibold">
+              Your membership is not active.
+            </p>
+            <p className="text-xs text-blood/70 mt-1">
+              Your membership expired on {new Date(dbUser.membershipExpiry).toLocaleDateString()}. Please renew your membership to continue.
+            </p>
+          </div>
+        )}
+
+        {!isExitAction && !membershipExpired && !hasActiveMembership && (
           <div className="rounded-xl border border-blood/30 bg-blood/10 px-6 py-4">
             <p className="text-sm text-blood font-semibold">
               You don't have an active membership. Please activate your membership first.
@@ -344,7 +367,7 @@ export default function VerifyFace() {
               size="xl"
               className="w-full gap-3"
               onClick={startCamera}
-              disabled={(isExitAction ? !isFaceRegistered : (!hasActiveMembership || !isFaceRegistered))}
+              disabled={(isExitAction ? !isFaceRegistered : (!hasActiveMembership || !isFaceRegistered || membershipExpired))}
             >
             <ScanFace size={24} />
             Open Camera

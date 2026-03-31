@@ -39,7 +39,7 @@ function getRazorpayInstance() {
 // ─────────────────────────────────────────────────────────────────
 // Plan Prices (in paise — multiply INR by 100)
 // ─────────────────────────────────────────────────────────────────
-const REGISTRATION_FEE = 80000; // ₹800 for first-time users only
+const REGISTRATION_FEE = 20000; // ₹200 for first-time users only
 const PLAN_PRICES = {
   "1month": 60000, // ₹600
   "3months": 150000, // ₹1500
@@ -63,7 +63,7 @@ function getPlanPrice(planId) {
 
 /**
  * Calculate total payment amount for a user
- * If user hasn't paid registration fee, add ₹10 to plan price
+ * If user hasn't paid registration fee, add ₹200 to plan price
  * @param {string} planId - Plan identifier
  * @param {boolean} isFirstTimeUser - Whether user has paid registration fee
  * @returns {Object} { totalAmount, planAmount, registrationFeeAmount, includesRegistrationFee }

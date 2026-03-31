@@ -156,11 +156,18 @@ export default function AdminMembers() {
           ) : (
             <div className="overflow-x-auto">
               {(() => {
-                const filtered = users.filter((u) =>
-                  (u.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-                  (u.email || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-                  (u.userId || "").toLowerCase().includes(searchQuery.toLowerCase())
-                );
+                const filtered = users
+                  .filter((u) =>
+                    (u.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    (u.email || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    (u.userId || "").toLowerCase().includes(searchQuery.toLowerCase())
+                  )
+                  // Sort by userId numerically (2000, 2001, 2002...)
+                  .sort((a, b) => {
+                    const userIdA = parseInt(a.userId || "0", 10);
+                    const userIdB = parseInt(b.userId || "0", 10);
+                    return userIdA - userIdB;
+                  });
 
                 if (filtered.length === 0) {
                   return (
@@ -182,9 +189,11 @@ export default function AdminMembers() {
                         <th className="py-3 pr-4 whitespace-nowrap min-w-max">Name</th>
                         <th className="py-3 pr-4 whitespace-nowrap min-w-max">Email</th>
                         <th className="py-3 pr-4 whitespace-nowrap min-w-max">User ID</th>
-                        <th className="py-3 pr-4 whitespace-nowrap min-w-max">Membership</th>
+                        <th className="py-3 pr-4 whitespace-nowrap min-w-max">Status</th>
                         <th className="py-3 pr-4 whitespace-nowrap min-w-max">Plan</th>
-                        <th className="py-3 pr-4 whitespace-nowrap min-w-max">Expiry</th>
+                        <th className="py-3 pr-4 whitespace-nowrap min-w-max">Start Date</th>
+                        <th className="py-3 pr-4 whitespace-nowrap min-w-max">Expiry Status</th>
+                        <th className="py-3 pr-4 whitespace-nowrap min-w-max">Face</th>
                         <th className="py-3 pr-4 whitespace-nowrap min-w-max">Streak</th>
                         <th className="py-3 text-right whitespace-nowrap min-w-max">Action</th>
                       </tr>
@@ -214,9 +223,57 @@ export default function AdminMembers() {
                         </span>
                       </td>
                       <td className="py-3 pr-4 text-xs text-white/60 whitespace-nowrap min-w-max">
-                        {u.membershipExpiry
-                          ? new Date(u.membershipExpiry).toLocaleDateString()
+                        {u.membershipStartDate
+                          ? new Date(u.membershipStartDate).toLocaleDateString()
                           : "—"}
+                      </td>
+                      <td className="py-3 pr-4 whitespace-nowrap min-w-max">
+                        {u.membershipExpiry ? (() => {
+                          const expiryDate = new Date(u.membershipExpiry);
+                          const now = new Date();
+                          const isExpired = expiryDate <= now;
+                          const daysRemaining = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
+                          
+                          if (isExpired) {
+                            return (
+                              <div className="flex flex-col gap-1">
+                                <span className="text-xs bg-blood/30 text-blood px-2 py-1 rounded font-semibold">
+                                  EXPIRED
+                                </span>
+                                <span className="text-xs text-white/40">
+                                  {expiryDate.toLocaleDateString()}
+                                </span>
+                              </div>
+                            );
+                          } else if (daysRemaining <= 7) {
+                            return (
+                              <div className="flex flex-col gap-1">
+                                <span className="text-xs bg-yellow-500/30 text-yellow-300 px-2 py-1 rounded font-semibold">
+                                  {daysRemaining} day{daysRemaining !== 1 ? 's' : ''} left
+                                </span>
+                                <span className="text-xs text-white/40">
+                                  {expiryDate.toLocaleDateString()}
+                                </span>
+                              </div>
+                            );
+                          } else {
+                            return (
+                              <div className="flex flex-col gap-1">
+                                <span className="text-xs text-emerald-300">
+                                  {daysRemaining} days
+                                </span>
+                                <span className="text-xs text-white/40">
+                                  {expiryDate.toLocaleDateString()}
+                                </span>
+                              </div>
+                            );
+                          }
+                        })() : "—"}
+                      </td>
+                      <td className="py-3 pr-4 whitespace-nowrap min-w-max">
+                        <Badge variant={u.faceRegistered ? "active" : "pending"}>
+                          {u.faceRegistered ? "✓ Registered" : "✗ Not Registered"}
+                        </Badge>
                       </td>
                       <td className="py-3 pr-4 font-display text-lg font-bold text-blood whitespace-nowrap min-w-max">{u.currentStreak}</td>
                       <td className="py-3 text-right flex items-center justify-end gap-2 whitespace-nowrap min-w-max">

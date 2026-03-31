@@ -18,10 +18,14 @@ exports.getMe = async (req, res, next) => {
 // ─────────────────────────────────────────────
 // GET /api/users
 // Admin‑only: return every user in the system.
+// Sorted by userId numerically (2000, 2001, 2002...)
 // ─────────────────────────────────────────────
 exports.getAllUsers = async (_req, res, next) => {
   try {
-    const users = await User.find().select("-faceDescriptor").sort({ joinDate: -1 });
+    const users = await User.find()
+      .select("-faceDescriptor")
+      .collation({ locale: "en_US", numericOrdering: true })
+      .sort({ userId: 1 });
     return res.json({ users });
   } catch (err) {
     next(err);

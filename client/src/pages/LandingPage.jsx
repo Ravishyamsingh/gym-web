@@ -659,7 +659,7 @@ export default function LandingPage() {
             className="mt-12 max-w-2xl mx-auto bg-gradient-to-r from-blood/10 to-blood/5 border border-blood/30 rounded-xl p-6"
           >
             <p className="text-center text-white/80 text-sm sm:text-base">
-              <span className="font-semibold text-blood">📝 Note:</span> First-time members are required to pay a one-time registration fee of <span className="font-bold text-blood">₹10</span> along with their selected membership plan. This fee is applicable only once and will not be charged during membership renewals.
+              <span className="font-semibold text-blood">📝 Note:</span> First-time members are required to pay a one-time registration fee of <span className="font-bold text-blood">₹200</span> along with their selected membership plan. This fee is applicable only once and will not be charged during membership renewals.
             </p>
           </motion.div>
 

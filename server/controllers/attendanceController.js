@@ -317,8 +317,10 @@ async function validateEntryEligibilityOrThrow(user) {
   }
 
   if (user.membershipExpiry && new Date() > new Date(user.membershipExpiry)) {
-    throw createHttpError(403, "Access denied — membership expired", {
-      error: "Access denied — membership expired",
+    throw createHttpError(403, "Your membership is not active.", {
+      error: "Your membership is not active.",
+      code: "MEMBERSHIP_EXPIRED",
+      membershipExpiry: user.membershipExpiry,
     });
   }
 

@@ -372,7 +372,7 @@ exports.createOrder = async (req, res, next) => {
       registrationFeeAmount: registrationFeeAmount / 100,
       membershipFeeAmount: membershipFeeAmount / 100,
       message: includesRegistrationFee 
-        ? "First-time payment includes ₹800 registration fee + membership plan amount"
+        ? "First-time payment includes ₹200 registration fee + membership plan amount"
         : "Order created. Proceed to payment.",
     });
   } catch (err) {

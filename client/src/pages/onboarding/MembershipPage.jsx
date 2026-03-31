@@ -64,7 +64,7 @@ export default function MembershipPage() {
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [showCheckout, setShowCheckout] = useState(false);
 
-  const REGISTRATION_FEE = 800; // First-time registration fee
+  const REGISTRATION_FEE = 200; // First-time registration fee
   
   // Helper function to get combined price for first-time users
   const getDisplayPrice = () => {

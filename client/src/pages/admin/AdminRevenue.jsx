@@ -27,6 +27,8 @@ export default function AdminRevenue() {
   const [analytics, setAnalytics] = useState(null);
   const [distribution, setDistribution] = useState(null);
   const [logs, setLogs] = useState(null);
+  const [expiringUsers, setExpiringUsers] = useState(null);
+  const [expiredUsers, setExpiredUsers] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortOrder, setSortOrder] = useState("desc");
@@ -36,17 +38,21 @@ export default function AdminRevenue() {
       setError(null);
       setLoading(true);
 
-      const [revRes, anaRes, distRes, logRes] = await Promise.all([
+      const [revRes, anaRes, distRes, logRes, expiringRes, expiredRes] = await Promise.all([
         api.get("/admin/revenue/summary"),
         api.get("/admin/revenue/analytics"),
         api.get("/admin/revenue/plan-distribution"),
         api.get(`/admin/revenue/membership-logs?page=1&limit=${ITEMS_PER_PAGE}&sortBy=${sortBy}&order=${sortOrder}`),
+        api.get("/admin/revenue/expiry-alerts?daysFromNow=7&limit=10"),
+        api.get("/admin/revenue/expiry-alerts?daysFromNow=-1&limit=10"),
       ]);
 
       setRevenue(revRes.data);
       setAnalytics(anaRes.data);
       setDistribution(distRes.data);
       setLogs(logRes.data);
+      setExpiringUsers(expiringRes.data?.data || []);
+      setExpiredUsers(expiredRes.data?.data || []);
     } catch (err) {
       const errorMsg = err.response?.data?.error || "Failed to load revenue data";
       setError(errorMsg);
@@ -246,6 +252,84 @@ export default function AdminRevenue() {
             </div>
           </CardContent>
         </Card>
+      </motion.div>
+
+      {/* Membership Expiry Alerts */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.55 }}
+        className="mb-6"
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Expiring Soon */}
+          <Card>
+            <CardContent className="p-6">
+              <h2 className="font-bold text-light mb-4 flex items-center gap-2">
+                <Calendar size={18} className="text-orange-400" />
+                Expiring within 7 days
+              </h2>
+              {expiringUsers && expiringUsers.length > 0 ? (
+                <div className="space-y-3">
+                  {expiringUsers.map((user) => {
+                    const daysLeft = Math.ceil((new Date(user.membershipExpiry) - new Date()) / (1000 * 60 * 60 * 24));
+                    return (
+                      <div key={user._id} className="p-3 bg-orange-500/10 border border-orange-500/30 rounded-lg text-sm">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-semibold text-light">{user.name}</p>
+                            <p className="text-xs text-white/50">{user.email}</p>
+                          </div>
+                          <Badge variant="pending">{daysLeft} days</Badge>
+                        </div>
+                        <div className="mt-2 flex justify-between text-xs">
+                          <span className="text-white/60">Plan: {user.membershipPlan}</span>
+                          <span className="text-orange-400">Due: {new Date(user.membershipExpiry).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-white/40">No memberships expiring soon</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Recently Expired */}
+          <Card>
+            <CardContent className="p-6">
+              <h2 className="font-bold text-light mb-4 flex items-center gap-2">
+                <AlertTriangle size={18} className="text-blood" />
+                Recently expired
+              </h2>
+              {expiredUsers && expiredUsers.length > 0 ? (
+                <div className="space-y-3">
+                  {expiredUsers.map((user) => {
+                    const daysSinceExpiry = Math.ceil((new Date() - new Date(user.membershipExpiry)) / (1000 * 60 * 60 * 24));
+                    return (
+                      <div key={user._id} className="p-3 bg-blood/10 border border-blood/30 rounded-lg text-sm">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-semibold text-light">{user.name}</p>
+                            <p className="text-xs text-white/50">{user.email}</p>
+                          </div>
+                          <Badge variant="expired">Expired</Badge>
+                        </div>
+                        <div className="mt-2 flex justify-between text-xs">
+                          <span className="text-white/60">Plan: {user.membershipPlan}</span>
+                          <span className="text-blood">{daysSinceExpiry} day{daysSinceExpiry !== 1 ? 's' : ''} ago</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-white/40">No recently expired memberships</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </motion.div>
 
       {/* Recent Membership Activations */}
