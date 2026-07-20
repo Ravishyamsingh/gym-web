@@ -78,15 +78,6 @@ export default function VerifyFace() {
     setMessage("Starting camera…");
 
     try {
-      // Fetch stored face descriptor from server first
-      setMessage("Loading face data…");
-      const hasDescriptor = await fetchStoredDescriptor();
-      if (!hasDescriptor) {
-        setStatus("denied");
-        setMessage("No baseline face on file. Please complete face registration first.");
-        return;
-      }
-
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
         audio: false,
@@ -97,12 +88,24 @@ export default function VerifyFace() {
         await videoRef.current.play().catch(() => {});
       }
 
+      // Fetch stored face descriptor after the camera is live so webcam access
+      // is not blocked by a slow or failing profile lookup.
+      setMessage("Loading face data…");
+      const hasDescriptor = await fetchStoredDescriptor();
+      if (!hasDescriptor) {
+        stopCamera();
+        setStatus("denied");
+        setMessage("No baseline face on file. Please complete face registration first.");
+        return;
+      }
+
       setMessage("Loading face models…");
       await loadFaceModels();
 
       setStatus("scanning");
       setMessage("Look directly at the camera, then tap Verify");
     } catch {
+      stopCamera();
       setStatus("denied");
       setMessage("Camera access denied or face models failed to load.");
     }

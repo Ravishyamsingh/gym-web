@@ -33,9 +33,8 @@ function validateEmail(email) {
 }
 
 function validateUserId(userId) {
-  // Numeric only, exactly 4 digits (2000-9999)
-  const userIdRegex = /^\d{4}$/;
-  return userIdRegex.test(userId);
+  // Support legacy alphanumeric IDs and new generated numeric IDs.
+  return typeof userId === "string" && userId.trim().length > 0 && userId.trim().length <= 64;
 }
 
 function validatePassword(password) {

@@ -1,6 +1,19 @@
 node_modules/
 dist/
 .env
+*.env
+*.env.*
+.env.local
+.env.development
+.env.development.local
+.env.production
+.env.production.local
+.env.test
+.env.test.local
+client/.env
+client/.env.*
+server/.env
+server/.env.*
 *.env*
 package-lock.json
 *.backup
@@ -11,4 +24,5 @@ package-lock.json
 .DS_Store
 Thumbs.db
 server/config/serviceAccountKey.json
+server/config/serviceAccountKey*.json
 

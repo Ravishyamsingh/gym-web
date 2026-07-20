@@ -17,9 +17,7 @@ const userSchema = new mongoose.Schema(
       unique: true,
       sparse: true,
       trim: true,
-      minlength: 4,
-      maxlength: 4,
-      match: /^\d{4}$/, // exactly 4 digits (2000-9999)
+      maxlength: 64,
       index: true,
     },
     password: {

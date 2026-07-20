@@ -254,7 +254,7 @@ export default function LandingPage() {
       {/* ── Navbar ──────────────────────────── */}
       <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-4 bg-void/80 backdrop-blur-lg border-b border-white/5">
         <Link to="/" className="font-display text-2xl font-bold tracking-wider uppercase">
-          Om Muruga <span className="text-blood">Olympia Fitness</span>
+          Olympia<span className="text-blood"> Fitness</span>
         </Link>
         <div className="hidden md:flex items-center gap-6 text-sm text-white/60">
           <a href="#about" className="nav-link">About</a>
