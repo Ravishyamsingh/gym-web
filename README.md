@@ -156,6 +156,11 @@ Common values include API URLs, Firebase credentials, Razorpay keys, and MongoDB
 - Do not commit Firebase service account JSON files
 - Keep API secrets and payment keys in environment variables only
 
+## Author
+
+**Ravi Shyam Singh**  
+[LinkedIn](https://www.linkedin.com/in/ravi-shyam-singh-790273367/) | [GitHub](https://github.com/Ravishyamsingh/leaveflow)
+
 ## License
 
 This project is licensed under the MIT License.
